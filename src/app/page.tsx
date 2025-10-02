@@ -6,14 +6,30 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import { Dialog } from "@headlessui/react";
 import Image from "next/image";
 import { RoomAvailability, BookingEvent, RoomStatus } from "@/types";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export default function Home() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const { isAdmin, checkingAdmin } = useAdminAuth();
+  
+  // All useState hooks must be at the top level
   const [rooms, setRooms] = useState<RoomAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Track current month view
+  
+  // ALL useEffect hooks must also be at the top level before any conditional returns
+  
+  // Redirect admin users to dashboard
+  useEffect(() => {
+    if (user && isAdmin === true) {
+      window.location.href = '/dashboard';
+    }
+  }, [user, isAdmin]);
 
   // Fetch room availability when month changes
   useEffect(() => {
@@ -61,7 +77,7 @@ export default function Home() {
     fetchAvailability();
   }, [currentMonth]);
 
-  // Create room availability events for each date
+  // Create room availability events for each date - FUNCTION DEFINITION (not a hook)
   const createRoomAvailabilityEvents = () => {
     const events: BookingEvent[] = [];
     
@@ -128,7 +144,17 @@ export default function Home() {
     return events;
   };
 
+  // Move useMemo hook to after all other hooks
   const allEvents = useMemo(() => createRoomAvailabilityEvents(), [rooms, currentMonth]);
+
+  // Show loading while checking admin status (AFTER all hooks including useMemo)
+  if (checkingAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Checking access...</div>
+      </div>
+    );
+  }
 
   const handleEventClick = (info: any) => {
     setSelectedBooking(info.event as BookingEvent);
