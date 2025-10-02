@@ -499,7 +499,8 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="bookings" />
 
@@ -1255,7 +1256,7 @@ export default function BookingsPage() {
         </div>
       </Dialog>
     </main>
-    </div>
+      </div>
     </AdminAuthGuard>
   );
 }
