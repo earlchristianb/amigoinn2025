@@ -487,14 +487,16 @@ export default function BookingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminNavigation currentPage="bookings" />
-        <main className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-gray-600">Loading bookings...</div>
-          </div>
-        </main>
-      </div>
+      <AdminAuthGuard>
+        <div className="min-h-screen bg-gray-50">
+          <AdminNavigation currentPage="bookings" />
+          <main className="p-6">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-lg text-gray-600">Loading bookings...</div>
+            </div>
+          </main>
+        </div>
+      </AdminAuthGuard>
     );
   }
 
