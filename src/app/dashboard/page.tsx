@@ -86,9 +86,13 @@ export default function DashboardPage() {
                 // Get last day of selected month
                 const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
                 
-                // Format dates for API query (YYYY-MM-DD)
-                const startDate = firstDayOfMonth.toISOString().split('T')[0];
-                const endDate = lastDayOfMonth.toISOString().split('T')[0];
+                // Format dates for API query (YYYY-MM-DD) - avoid timezone issues
+                const startDate = `${firstDayOfMonth.getFullYear()}-${String(firstDayOfMonth.getMonth() + 1).padStart(2, '0')}-${String(firstDayOfMonth.getDate()).padStart(2, '0')}`;
+                const endDate = `${lastDayOfMonth.getFullYear()}-${String(lastDayOfMonth.getMonth() + 1).padStart(2, '0')}-${String(lastDayOfMonth.getDate()).padStart(2, '0')}`;
+                
+                console.log('Dashboard fetching bookings for date range:', startDate, 'to', endDate);
+                console.log('First day of month:', firstDayOfMonth);
+                console.log('Last day of month:', lastDayOfMonth);
                 
                 // Build URL with date range filter
                 let url = `/api/bookings?startDate=${startDate}&endDate=${endDate}`;
@@ -116,8 +120,9 @@ export default function DashboardPage() {
                 const events: BookingEvent[] = [];
 
                 // Generate events for each day of the current month
-                for (let date = new Date(firstDayOfMonth); date <= lastDayOfMonth; date.setDate(date.getDate() + 1)) {
-                    const dateStr = date.toISOString().split('T')[0];
+                for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+                    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                     
                     // Filter rooms if selectedRoom is set
                     const roomsToShow = selectedRoom 

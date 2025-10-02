@@ -124,7 +124,7 @@ export default function ReportsPage() {
         .join("; "),
       "Total Price (₱)": booking.total_price?.toFixed(2) || "0.00",
       "Discount (₱)": booking.discount?.toFixed(2) || "0.00",
-      "Grand Total (₱)": booking.grand_total?.toFixed(2) || "0.00",
+      "Grand Total (₱)": ((booking.total_price || 0) - (booking.discount || 0)).toFixed(2),
       "Total Paid (₱)": booking.total_paid?.toFixed(2) || "0.00",
       "Remaining (₱)": booking.remaining?.toFixed(2) || "0.00",
       "Payment Status":

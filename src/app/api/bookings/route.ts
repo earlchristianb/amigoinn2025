@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("endDate");
 
     // Build where clause
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const whereClause: any = {};
 
     // Filter by room if provided
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Include the entire end date
       
       if (!whereClause.bookingRooms) {
         whereClause.bookingRooms = { some: {} };
@@ -75,11 +77,16 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
+    console.log('[Bookings API] Date range received:', startDate, 'to', endDate);
+    console.log('[Bookings API] Parsed start date:', startDate ? new Date(startDate) : 'none');
+    console.log('[Bookings API] Parsed end date:', endDate ? new Date(endDate) : 'none');
     console.log('Raw bookings from database:', bookings);
     console.log('Number of bookings found:', bookings.length);
 
     // Calculate remaining and serialize BigInt values
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const formatted: Booking[] = bookings.map((b: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalPaid = b.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
       const remaining = Number(b.totalPrice) - totalPaid - Number(b.discount || 0);
       
@@ -95,9 +102,10 @@ export async function GET(req: NextRequest) {
           name: b.guest.name,
           email: b.guest.email,
           phone: b.guest.phone,
-          createdAt: b.guest.createdAt.toISOString(),
-          updatedAt: b.guest.updatedAt.toISOString(),
+          created_at: b.guest.createdAt.toISOString(),
+          updated_at: b.guest.updatedAt.toISOString(),
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         booking_rooms: b.bookingRooms.map((br: any) => ({
           id: br.id.toString(),
           booking_id: br.bookingId.toString(),
@@ -121,6 +129,7 @@ export async function GET(req: NextRequest) {
           },
         },
       })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       booking_extras: b.bookingExtras?.map((ex: any) => ({
         id: ex.id.toString(),
         booking_id: ex.bookingId.toString(),
@@ -130,6 +139,7 @@ export async function GET(req: NextRequest) {
         created_at: ex.createdAt.toISOString(),
         updated_at: ex.updatedAt.toISOString(),
       })) || [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       payments: b.payments.map((p: any) => ({
         id: p.id.toString(),
         booking_id: p.bookingId.toString(),
@@ -235,6 +245,61 @@ export async function POST(req: NextRequest) {
         roomId: r.roomId.toString()
       }))
     });
+
+    // Check for existing bookings that would conflict
+    for (const room of validatedRooms) {
+      const existingBookings = await prisma.bookingRoom.findMany({
+        where: {
+          roomId: room.roomId,
+          OR: [
+            // New booking starts during existing booking
+            {
+              AND: [
+                { checkInDate: { lte: room.checkInDate } },
+                { checkOutDate: { gt: room.checkInDate } }
+              ]
+            },
+            // New booking ends during existing booking
+            {
+              AND: [
+                { checkInDate: { lt: room.checkOutDate } },
+                { checkOutDate: { gte: room.checkOutDate } }
+              ]
+            },
+            // New booking completely contains existing booking
+            {
+              AND: [
+                { checkInDate: { gte: room.checkInDate } },
+                { checkOutDate: { lte: room.checkOutDate } }
+              ]
+            },
+            // Existing booking completely contains new booking
+            {
+              AND: [
+                { checkInDate: { lte: room.checkInDate } },
+                { checkOutDate: { gte: room.checkOutDate } }
+              ]
+            }
+          ]
+        },
+        include: {
+          room: true,
+          booking: {
+            include: {
+              guest: true
+            }
+          }
+        }
+      });
+
+      if (existingBookings.length > 0) {
+        const conflictDetails = existingBookings.map((eb:any) => 
+          `Room ${eb.room.roomNumber} is already booked by ${eb.booking.guest.name} from ${eb.checkInDate.toLocaleDateString()} to ${eb.checkOutDate.toLocaleDateString()}`
+        ).join('; ');
+        
+        throw new Error(`Booking conflict detected: ${conflictDetails}`);
+      }
+    }
 
     const booking = await prisma.booking.create({
       data: {

@@ -10,9 +10,13 @@ export async function GET() {
     });
     
     // Convert BigInt to string for JSON serialization
-    const serializedGuests: Guest[] = guests.map((guest:Guest) => ({
-      ...guest,
+    const serializedGuests = guests.map((guest: any) => ({
       id: guest.id.toString(),
+      name: guest.name,
+      email: guest.email,
+      phone: guest.phone,
+      created_at: guest.createdAt.toISOString(),
+      updated_at: guest.updatedAt.toISOString(),
     }));
     
     return NextResponse.json(serializedGuests);
@@ -41,8 +45,12 @@ export async function POST(req: NextRequest) {
 
     // Convert BigInt to string for JSON serialization
     const serializedGuest = {
-      ...guest,
       id: guest.id.toString(),
+      name: guest.name,
+      email: guest.email,
+      phone: guest.phone,
+      created_at: guest.createdAt.toISOString(),
+      updated_at: guest.updatedAt.toISOString(),
     };
 
     return NextResponse.json(serializedGuest);

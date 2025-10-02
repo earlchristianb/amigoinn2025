@@ -1126,7 +1126,7 @@ export default function BookingsPage() {
                     </div>
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-700">Grand Total:</span>
-                      <span className="text-black font-bold">₱{selectedBooking.grand_total?.toFixed(2) || "0.00"}</span>
+                      <span className="text-black font-bold">₱{((selectedBooking.total_price || 0) - (selectedBooking.discount || 0)).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-700">Total Paid:</span>

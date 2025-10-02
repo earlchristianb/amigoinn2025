@@ -23,8 +23,13 @@ export default function Home() {
         const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
         const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
         
-        const startDate = firstDay.toISOString().split('T')[0];
-        const endDate = lastDay.toISOString().split('T')[0];
+        // Format dates avoiding timezone issues
+        const startDate = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
+        const endDate = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+        
+        console.log('Home page fetching availability for date range:', startDate, 'to', endDate);
+        console.log('First day:', firstDay);
+        console.log('Last day:', lastDay);
         
         const res = await fetch(`/api/availability?startDate=${startDate}&endDate=${endDate}`);
         
@@ -71,8 +76,9 @@ export default function Home() {
     }
     
     // Generate events for each day of the month
-    for (let date = new Date(firstDay); date <= lastDay; date.setDate(date.getDate() + 1)) {
-      const dateStr = date.toISOString().split('T')[0];
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       
       // Show ALL rooms (101-208) on every date
       rooms.forEach(room => {

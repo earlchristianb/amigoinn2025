@@ -14,8 +14,16 @@ const isPublicRoute = createRouteMatcher([
   "/api/availability" // Allow public access to availability API
 ]);
 
-export default clerkMiddleware((auth, req) => {
-  if (isProtectedRoute(req)) auth().protect();
+export default clerkMiddleware(async (auth, req) => {
+  const authObj = await auth();
+  
+  // If it's a protected route and user is not authenticated, they'll be redirected by Clerk automatically
+  if (isProtectedRoute(req) && !authObj.userId) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect_url', req.url);
+    return Response.redirect(loginUrl);
+  }
+  
   if (isPublicRoute(req)) return;
 });
 

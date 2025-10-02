@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { guestId, booking_rooms, booking_extras, total_price, discount } = await req.json();
 
   if (!guestId || !booking_rooms || !Array.isArray(booking_rooms) || booking_rooms.length === 0 || !total_price) {
@@ -51,7 +51,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     // Create new booking extras if provided
     if (booking_extras && booking_extras.length > 0) {
       await tx.bookingExtra.createMany({
-        data: booking_extras.map(extra => ({
+        data: booking_extras.map((extra: any) => ({
           bookingId: BigInt(id),
           label: extra.label,
           price: Number(extra.price),
@@ -143,8 +143,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   await prisma.booking.delete({ where: { id: BigInt(id) } });
   return NextResponse.json({ success: true });
 }

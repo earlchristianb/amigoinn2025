@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { RoomAvailability } from "@/types";
+import { BookingRoom, Room, RoomAvailability } from "@/types";
 
 export async function GET(req: Request) {
   try {
@@ -8,31 +8,33 @@ export async function GET(req: Request) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     
-    console.log('[Availability API] Starting fetch...');
-    console.log('[Availability API] Date range:', startDate, 'to', endDate);
+  console.log('[Availability API] Starting fetch...');
+  console.log('[Availability API] Date range:', startDate, 'to', endDate);
+  console.log('[Availability API] Parsed start date:', startDate ? new Date(startDate) : 'none');
+  console.log('[Availability API] Parsed end date:', endDate ? new Date(endDate) : 'none');
     
     // Build date filter for booking rooms
-    const dateFilter: any = startDate && endDate ? {
+    const dateFilter = startDate && endDate ? {
       OR: [
         // Check-in is within range
         {
           checkInDate: {
             gte: new Date(startDate),
-            lte: new Date(endDate)
+            lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
           }
         },
         // Check-out is within range
         {
           checkOutDate: {
             gte: new Date(startDate),
-            lte: new Date(endDate)
+            lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
           }
         },
         // Booking spans the entire range
         {
           AND: [
             { checkInDate: { lte: new Date(startDate) } },
-            { checkOutDate: { gte: new Date(endDate) } }
+            { checkOutDate: { gte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) } }
           ]
         }
       ]
@@ -71,13 +73,13 @@ export async function GET(req: Request) {
     console.log('[Availability API] Rooms fetched:', rooms.length);
 
     // Format data for calendar display
-    const availabilityData: RoomAvailability[] = rooms.map((room: any) => ({
+    const availabilityData: RoomAvailability[] = rooms.map((room:any) => ({
       id: room.id.toString(),
       room_number: room.roomNumber,
       type: room.roomType?.name || 'Unknown', 
       base_price: Number(room.roomType?.basePrice || 0),
       is_available: room.isAvailable,
-      bookings: room.bookingRooms?.map((bookingRoom: any) => ({
+      bookings: room.bookingRooms?.map((bookingRoom:any) => ({
         check_in: bookingRoom.checkInDate.toISOString(),
         check_out: bookingRoom.checkOutDate.toISOString(),
         guest_name: bookingRoom.booking?.guest?.name || 'Unknown'

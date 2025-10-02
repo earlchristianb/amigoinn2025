@@ -56,8 +56,8 @@ export default function AdminNavigation({ currentPage }: AdminNavigationProps) {
               onClick={handleLogout}
               className="px-4 py-2 text-white rounded transition-colors"
               style={{backgroundColor: '#8B4513'}}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#A0522D'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#8B4513'}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#A0522D'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = '#8B4513'}
             >
               Logout
             </button>

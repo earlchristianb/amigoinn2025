@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { RoomType, RoomTypeFormData } from "@/types";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { name, description, base_price }: RoomTypeFormData = await req.json();
 
     if (!name || base_price === undefined) {
@@ -16,15 +16,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       data: {
         name,
         description: description || null,
-        base_price: Number(base_price),
+        basePrice: Number(base_price),
       },
     });
 
     // Convert BigInt to string for JSON serialization
-    const serializedRoomType: RoomType = {
-      ...roomType,
+    const serializedRoomType = {
       id: roomType.id.toString(),
-      base_price: Number(roomType.base_price),
+      name: roomType.name,
+      description: roomType.description,
+      base_price: Number(roomType.basePrice),
+      created_at: roomType.createdAt.toISOString(),
+      updated_at: roomType.updatedAt.toISOString(),
     };
 
     return NextResponse.json(serializedRoomType);
@@ -34,9 +37,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     await prisma.roomType.delete({
       where: { id: BigInt(id) },

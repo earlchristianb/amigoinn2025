@@ -10,10 +10,11 @@ export async function GET() {
     });
     
     // Convert BigInt to string for JSON serialization
-    const serializedRoomTypes: RoomType[] = roomTypes.map((roomType: RoomType) => ({
-      ...roomType,
+    const serializedRoomTypes: RoomType[] = roomTypes.map((roomType) => ({
       id: roomType.id.toString(),
-      base_price: Number(roomType.base_price),
+      name: roomType.name,
+      description: roomType.description,
+      base_price: Number(roomType.basePrice),
     }));
     
     return NextResponse.json(serializedRoomTypes);
@@ -36,15 +37,16 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         description: description || null,
-        base_price: Number(base_price),
+        basePrice: Number(base_price),
       },
     });
 
     // Convert BigInt to string for JSON serialization
     const serializedRoomType: RoomType = {
-      ...roomType,
       id: roomType.id.toString(),
-      base_price: Number(roomType.base_price),
+      name: roomType.name,
+      description: roomType.description,
+      base_price: Number(roomType.basePrice),
     };
 
     return NextResponse.json(serializedRoomType);
