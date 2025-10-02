@@ -1,0 +1,144 @@
+// ======================================================
+// 🔹 DataSource & Generator
+// ======================================================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ======================================================
+// 🔹 Profiles
+// ======================================================
+model Profile {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("profiles")
+}
+
+// ======================================================
+// 🔹 Guests
+// ======================================================
+model Guest {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  bookings  Booking[]
+
+  @@map("guests")
+}
+
+// ======================================================
+// 🔹 Room Types
+// ======================================================
+model RoomType {
+  id          BigInt   @id @default(autoincrement())
+  name        String
+  description String?
+  basePrice   Decimal  @map("base_price") @db.Decimal(10,2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  rooms       Room[]
+
+  @@map("room_types")
+}
+
+// ======================================================
+// 🔹 Rooms
+// ======================================================
+model Room {
+  id          BigInt   @id @default(autoincrement())
+  roomNumber  String   @unique @map("room_number")
+  roomTypeId  BigInt   @map("room_type_id")
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  bookingRooms BookingRoom[]
+
+  @@map("rooms")
+}
+
+// ======================================================
+// 🔹 Bookings
+// ======================================================
+model Booking {
+  id        BigInt   @id @default(autoincrement())
+  guestId   BigInt   @map("guest_id")
+  totalPrice Decimal @map("total_price") @db.Decimal(10,2)
+  discount   Decimal @default(0) @db.Decimal(10,2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  bookingRooms BookingRoom[]
+  bookingExtras BookingExtra[]
+  payments     Payment[]
+
+  @@map("bookings")
+}
+
+// ======================================================
+// 🔹 Booking Rooms (junction table)
+// ======================================================
+model BookingRoom {
+  id          BigInt   @id @default(autoincrement())
+  bookingId   BigInt   @map("booking_id")
+  roomId      BigInt   @map("room_id")
+  checkInDate DateTime @map("check_in_date")
+  checkOutDate DateTime @map("check_out_date")
+  price       Decimal @db.Decimal(10,2)
+  discount    Decimal  @default(0) @db.Decimal(10,2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("booking_rooms")
+}
+
+// ======================================================
+// 🔹 Booking Extras (additional payables)
+// ======================================================
+model BookingExtra {
+  id          BigInt   @id @default(autoincrement())
+  bookingId   BigInt   @map("booking_id")
+  label       String   // e.g., "Extra Towel", "Motorcycle Rental", "Island Tour"
+  price       Decimal @db.Decimal(10,2)
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_extras")
+}
+
+// ======================================================
+// 🔹 Payments
+// ======================================================
+model Payment {
+  id        BigInt   @id @default(autoincrement())
+  bookingId BigInt   @map("booking_id")
+  amount    Decimal @db.Decimal(10,2)
+  method    String   @default("cash")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}

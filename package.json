@@ -6,22 +6,42 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "populate-rooms": "tsx scripts/populate-rooms.ts",
+    "clear-and-reseed": "tsx scripts/clear-and-reseed.ts",
+    "add-admin-emails": "tsx scripts/add-admin-emails.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.33.0",
+    "@fullcalendar/daygrid": "^6.1.19",
+    "@fullcalendar/react": "^6.1.19",
+    "@headlessui/react": "^2.2.9",
+    "@prisma/client": "^6.16.2",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.58.0",
+    "date-fns": "^4.1.0",
+    "decimal.js": "^10.6.0",
+    "next": "15.5.4",
+    "npm": "^11.6.1",
+    "papaparse": "^5.5.3",
+    "prisma": "^6.16.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "@eslint/eslintrc": "^3"
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.20.6",
+    "typescript": "^5"
   }
 }
