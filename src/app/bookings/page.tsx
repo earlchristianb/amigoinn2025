@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@headlessui/react";
 import { Booking, Guest, Room, BookingFormData, CreateBookingRoomRequest, CreateBookingExtraRequest } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function BookingsPage() {
@@ -1255,5 +1256,6 @@ export default function BookingsPage() {
       </Dialog>
     </main>
     </div>
+    </AdminAuthGuard>
   );
 }

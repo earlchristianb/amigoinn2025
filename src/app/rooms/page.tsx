@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Room, RoomType, RoomFormData, RoomTypeFormData } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function RoomsPage() {
@@ -116,7 +117,8 @@ export default function RoomsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="rooms" />
       
@@ -302,6 +304,7 @@ export default function RoomsPage() {
         </div>
       )}
       </main>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }
