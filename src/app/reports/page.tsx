@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { Booking } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 import Papa from "papaparse";
 
 export default function ReportsPage() {
-  const { user, isLoaded } = useUser();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
@@ -17,10 +16,6 @@ export default function ReportsPage() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // Auth states
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   // Summary statistics
   const [summary, setSummary] = useState({
@@ -33,34 +28,6 @@ export default function ReportsPage() {
     unpaidCount: 0,
   });
 
-  // Check admin status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (user?.emailAddresses?.[0]?.emailAddress) {
-        try {
-          const response = await fetch('/api/auth/check-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: user.emailAddresses[0].emailAddress })
-          });
-          const data = await response.json();
-          setIsAdmin(data.isAdmin);
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-        }
-      } else {
-        setIsAdmin(false);
-      }
-      setCheckingAdmin(false);
-    };
-
-    if (isLoaded && user) {
-      checkAdminStatus();
-    } else if (isLoaded && !user) {
-      setCheckingAdmin(false);
-    }
-  }, [isLoaded, user]);
 
   // Fetch all bookings
   useEffect(() => {
@@ -255,70 +222,24 @@ export default function ReportsPage() {
     toast.success("Summary exported successfully!");
   };
 
-  // Auth checks
-  if (!isLoaded || checkingAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg text-gray-600">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-600 mb-4">Authentication Required</h2>
-            <p className="text-gray-600 mb-4">You must be logged in to access this page.</p>
-            <button 
-              onClick={() => window.location.href = '/login'}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isAdmin === false) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
-            <p className="text-gray-600 mb-4">You are not authorized to access this page.</p>
-            <button 
-              onClick={() => window.location.href = '/'}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              Go to Home
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminNavigation currentPage="reports" />
-        <main className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-gray-600">Loading reports...</div>
-          </div>
-        </main>
-      </div>
+      <AdminAuthGuard>
+        <div className="min-h-screen bg-gray-50">
+          <AdminNavigation currentPage="reports" />
+          <main className="p-6">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-lg text-gray-600">Loading reports...</div>
+            </div>
+          </main>
+        </div>
+      </AdminAuthGuard>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="reports" />
 
@@ -546,7 +467,8 @@ export default function ReportsPage() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }
 
