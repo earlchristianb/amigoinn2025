@@ -1,54 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useClerk } from "@clerk/nextjs";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { Dialog } from "@headlessui/react";
 import { Room, BookingEvent, Booking } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 
 export default function DashboardPage() {
-    const { user, isLoaded } = useUser();
     const { signOut } = useClerk();
     const [events, setEvents] = useState<BookingEvent[]>([]);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-    const [checkingAdmin, setCheckingAdmin] = useState(true);
     const [currentMonth, setCurrentMonth] = useState(new Date()); // Track current month view
 
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<BookingEvent | null>(null);
 
-    // Check admin status
-    useEffect(() => {
-        const checkAdminStatus = async () => {
-            if (user?.emailAddresses?.[0]?.emailAddress) {
-                try {
-                    const response = await fetch('/api/auth/check-admin', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: user.emailAddresses[0].emailAddress })
-                    });
-                    const data = await response.json();
-                    setIsAdmin(data.isAdmin);
-                } catch (error) {
-                    console.error('Error checking admin status:', error);
-                    setIsAdmin(false);
-                }
-            } else {
-                setIsAdmin(false);
-            }
-            setCheckingAdmin(false);
-        };
-
-        if (isLoaded && user) {
-            checkAdminStatus();
-        } else if (isLoaded && !user) {
-            setCheckingAdmin(false);
-        }
-    }, [isLoaded, user]);
 
     // Fetch rooms
     useEffect(() => {
@@ -248,28 +218,10 @@ export default function DashboardPage() {
         await signOut({ redirectUrl: '/' });
     };
 
-    // Conditional rendering after all hooks
-    if (!isLoaded || checkingAdmin) return <p>Loading...</p>;
-    if (!user) return <button onClick={() => window.location.href = '/login'}>Go to Login</button>;
-    if (isAdmin === false) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
-                <div className="bg-white shadow-md rounded p-8 w-96 text-center">
-                    <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
-                    <p className="text-gray-600 mb-4">You are not authorized to access this application.</p>
-                    <button 
-                        onClick={() => signOut()}
-                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                        Sign Out
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <AdminAuthGuard>
+            <div className="min-h-screen bg-gray-50">
             <AdminNavigation currentPage="dashboard" />
 
             {/* Main Content */}
@@ -475,6 +427,7 @@ export default function DashboardPage() {
                 </div>
             </Dialog>
             </main>
-        </div>
+            </div>
+        </AdminAuthGuard>
     );
 }

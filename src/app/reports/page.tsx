@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Booking } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 import Papa from "papaparse";
 
@@ -26,6 +27,7 @@ export default function ReportsPage() {
     partialCount: 0,
     unpaidCount: 0,
   });
+
 
   // Fetch all bookings
   useEffect(() => {
@@ -222,19 +224,22 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminNavigation currentPage="reports" />
-        <main className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-gray-600">Loading reports...</div>
-          </div>
-        </main>
-      </div>
+      <AdminAuthGuard>
+        <div className="min-h-screen bg-gray-50">
+          <AdminNavigation currentPage="reports" />
+          <main className="p-6">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-lg text-gray-600">Loading reports...</div>
+            </div>
+          </main>
+        </div>
+      </AdminAuthGuard>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="reports" />
 
@@ -462,7 +467,8 @@ export default function ReportsPage() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }
 

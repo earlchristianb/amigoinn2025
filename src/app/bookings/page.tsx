@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@headlessui/react";
 import { Booking, Guest, Room, BookingFormData, CreateBookingRoomRequest, CreateBookingExtraRequest } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function BookingsPage() {
@@ -486,19 +487,22 @@ export default function BookingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminNavigation currentPage="bookings" />
-        <main className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-gray-600">Loading bookings...</div>
-          </div>
-        </main>
-      </div>
+      <AdminAuthGuard>
+        <div className="min-h-screen bg-gray-50">
+          <AdminNavigation currentPage="bookings" />
+          <main className="p-6">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-lg text-gray-600">Loading bookings...</div>
+            </div>
+          </main>
+        </div>
+      </AdminAuthGuard>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="bookings" />
 
@@ -1254,6 +1258,7 @@ export default function BookingsPage() {
         </div>
       </Dialog>
     </main>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }

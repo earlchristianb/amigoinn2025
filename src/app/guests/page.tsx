@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Guest, GuestFormData } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
+import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function GuestsPage() {
@@ -112,7 +113,8 @@ export default function GuestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AdminAuthGuard>
+      <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="guests" />
       
@@ -312,6 +314,7 @@ export default function GuestsPage() {
         </div>
       )}
       </main>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }

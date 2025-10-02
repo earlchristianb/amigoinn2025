@@ -1,31 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/rooms(.*)",
-  "/bookings(.*)",
-  "/guests(.*)"
-]);
-
-const isPublicRoute = createRouteMatcher([
-  "/login(.*)",
-  "/sign-up(.*)",
-  "/",
-  "/api/availability" // Allow public access to availability API
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  const authObj = await auth();
-  
-  // If it's a protected route and user is not authenticated, they'll be redirected by Clerk automatically
-  if (isProtectedRoute(req) && !authObj.userId) {
-    const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('redirect_url', req.url);
-    return Response.redirect(loginUrl);
-  }
-  
-  if (isPublicRoute(req)) return;
-});
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
