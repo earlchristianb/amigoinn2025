@@ -12,6 +12,10 @@ export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Summary statistics
   const [summary, setSummary] = useState({
     totalBookings: 0,
@@ -67,7 +71,21 @@ export default function ReportsPage() {
       setFilteredBookings(bookings);
       calculateSummary(bookings);
     }
+    // Reset to first page when filter changes
+    setCurrentPage(1);
   }, [selectedMonth, bookings]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredBookings.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
+
+  // Reset to first page when page size changes
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+  };
 
   // Calculate summary statistics
   const calculateSummary = (data: Booking[]) => {
@@ -314,7 +332,32 @@ export default function ReportsPage() {
 
         {/* Preview Table */}
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview Data</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Preview Data</h3>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-gray-700">Show:</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 bg-white text-black"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-gray-700">entries</span>
+              </div>
+              
+              <div className="text-gray-700">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredBookings.length)} of {filteredBookings.length} entries
+              </div>
+            </div>
+          </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full border-collapse border border-black">
               <thead>
@@ -328,7 +371,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredBookings.slice(0, 10).map((booking) => (
+                {paginatedBookings.map((booking) => (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="border border-black p-2 text-black">{booking.guest?.name || "Unknown"}</td>
                     <td className="border border-black p-2 text-black">
@@ -350,15 +393,73 @@ export default function ReportsPage() {
                 ))}
               </tbody>
             </table>
-            {filteredBookings.length > 10 && (
-              <p className="text-sm text-gray-600 mt-3">
-                Showing 10 of {filteredBookings.length} bookings. Export CSV to see all.
-              </p>
-            )}
             {filteredBookings.length === 0 && (
               <p className="text-center text-gray-500 py-8">No bookings found for the selected period</p>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-gray-700">
+                Page {currentPage} of {totalPages}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  First
+                </button>
+                
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                  if (pageNum > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1 border border-gray-300 rounded ${
+                        currentPage === pageNum
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white text-black hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+                
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Last
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

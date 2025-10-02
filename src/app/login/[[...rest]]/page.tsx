@@ -21,6 +21,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Amigo Inn</h1>
           <p className="text-lg text-gray-600">Siargao Island</p>
+          <p className="text-lg text-gray-600">Made by Earl na cutie</p>
         </div>
 
         {/* Clerk Sign In */}

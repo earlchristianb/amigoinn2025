@@ -14,11 +14,29 @@ export default function GuestsPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalGuests, setTotalGuests] = useState(0);
+
   // Fetch guests
   const fetchGuests = async () => {
     const res = await fetch("/api/guests");
     const data = await res.json();
     setGuests(data);
+    setTotalGuests(data.length);
+  };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(totalGuests / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedGuests = guests.slice(startIndex, endIndex);
+
+  // Reset to first page when page size changes
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
   };
 
   useEffect(() => {
@@ -104,12 +122,36 @@ export default function GuestsPage() {
           <p className="text-gray-600 mt-1">Manage guest information and bookings</p>
         </div>
 
-      <button
-        className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        onClick={openAddModal}
-      >
-        Add Guest
-      </button>
+      <div className="mb-4 flex justify-between items-center">
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={openAddModal}
+        >
+          Add Guest
+        </button>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-gray-700">Show:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 bg-white text-black"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-gray-700">entries</span>
+          </div>
+          
+          <div className="text-gray-700">
+            Showing {startIndex + 1} to {Math.min(endIndex, totalGuests)} of {totalGuests} entries
+          </div>
+        </div>
+      </div>
 
       <table className="w-full border-collapse border border-black">
         <thead>
@@ -121,7 +163,7 @@ export default function GuestsPage() {
           </tr>
         </thead>
         <tbody>
-          {guests.map((guest) => (
+          {paginatedGuests.map((guest) => (
             <tr key={guest.id} className="hover:bg-gray-50">
               <td className="border border-black p-2 text-black">{guest.name}</td>
               <td className="border border-black p-2 text-black">{guest.email || "-"}</td>
@@ -144,6 +186,69 @@ export default function GuestsPage() {
           ))}
         </tbody>
       </table>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-between items-center">
+          <div className="text-gray-700">
+            Page {currentPage} of {totalPages}
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page numbers */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+              if (pageNum > totalPages) return null;
+              
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-1 border border-gray-300 rounded ${
+                    currentPage === pageNum
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white text-black hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
