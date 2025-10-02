@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if email exists in admin_emails table
-    const adminCheck = await prisma.profile.findFirst({
+    const adminCheck = await prisma.adminEmail.findFirst({
       where: { email },
     });
 

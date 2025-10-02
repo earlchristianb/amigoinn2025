@@ -1,9 +1,57 @@
 "use client";
 
 import { SignIn } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export default function LoginPage() {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  const router = useRouter();
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (isLoaded && user?.emailAddresses?.[0]?.emailAddress) {
+        setCheckingAdmin(true);
+        const userEmail = user.emailAddresses[0].emailAddress;
+        
+        try {
+          const response = await fetch('/api/auth/check-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userEmail })
+          });
+          const data = await response.json();
+          
+          if (data.isAdmin) {
+            router.push('/dashboard');
+          } else {
+            // Sign out the non-admin user and redirect
+            await signOut();
+            router.push('/unauthorized');
+          }
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          router.push('/unauthorized');
+        }
+        setCheckingAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [isLoaded, user, router]);
+
+  // Show loading if checking admin status
+  if (checkingAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-lg text-gray-600">Verifying access...</div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 flex flex-col items-center">
@@ -35,7 +83,6 @@ export default function LoginPage() {
                 cardBox: 'w-full max-w-md',
               }
             }}
-            redirectUrl="/dashboard"
           />
         </div>
       </div>

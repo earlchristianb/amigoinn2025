@@ -14,12 +14,11 @@ async function addAdminEmails() {
     ];
 
     for (const email of adminEmails) {
-      await prisma.profile.upsert({
+      await prisma.adminEmail.upsert({
         where: { email },
         update: {},
         create: {
           email,
-          name: email.split('@')[0], // Use email prefix as name
         },
       });
       console.log(`Added admin email: ${email}`);
