@@ -10,6 +10,8 @@ export default function GuestsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,17 +24,42 @@ export default function GuestsPage() {
 
   // Fetch guests
   const fetchGuests = async () => {
-    const res = await fetch("/api/guests");
-    const data = await res.json();
-    setGuests(data);
-    setTotalGuests(data.length);
+    try {
+      setLoading(true);
+      setError("");
+      const res = await fetch("/api/guests");
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setGuests(data);
+        setTotalGuests(data.length);
+      } else {
+        console.error('Guests API returned non-array data:', data);
+        setGuests([]);
+        setTotalGuests(0);
+        setError('Invalid data format received from server');
+      }
+    } catch (error) {
+      console.error('Error fetching guests:', error);
+      setGuests([]);
+      setTotalGuests(0);
+      setError('Failed to load guests. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Calculate pagination
   const totalPages = Math.ceil(totalGuests / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedGuests = guests.slice(startIndex, endIndex);
+  const paginatedGuests = Array.isArray(guests) ? guests.slice(startIndex, endIndex) : [];
 
   // Reset to first page when page size changes
   const handlePageSizeChange = (newPageSize: number) => {
@@ -124,7 +151,37 @@ export default function GuestsPage() {
           <p className="text-gray-600 mt-1">Manage guest information and bookings</p>
         </div>
 
-      <div className="mb-4 flex justify-between items-center">
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="text-lg text-gray-600">Loading guests...</div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error loading guests</h3>
+                <div className="mt-2 text-sm text-red-700">{error}</div>
+                <div className="mt-4">
+                  <button
+                    onClick={fetchGuests}
+                    className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content - Only show when not loading and no error */}
+        {!loading && !error && (
+          <>
+            <div className="mb-4 flex justify-between items-center">
         <button
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           onClick={openAddModal}
@@ -251,6 +308,8 @@ export default function GuestsPage() {
           </div>
         </div>
       )}
+          </>
+        )}
 
       {/* Modal */}
       {modalOpen && (

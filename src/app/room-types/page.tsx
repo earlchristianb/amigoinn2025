@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RoomType, RoomTypeFormData } from "@/types";
+import { RoomType } from "@/types";
 import AdminNavigation from "@/components/AdminNavigation";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";

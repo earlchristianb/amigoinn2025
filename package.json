@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "prisma generate && next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "populate-rooms": "tsx scripts/populate-rooms.ts",
     "clear-and-reseed": "tsx scripts/clear-and-reseed.ts",
-    "add-admin-emails": "tsx scripts/add-admin-emails.ts"
+    "add-admin-emails": "tsx scripts/add-admin-emails.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.33.0",

@@ -29,6 +29,17 @@ export async function POST(req: NextRequest) {
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: "Invalid partial amount" }, { status: 400 });
     }
+    
+    // Check if partial payment exceeds remaining balance
+    const totalPaid = booking.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+    const remainingBalance = Number(booking.totalPrice) - totalPaid - Number(booking.discount || 0);
+    
+    if (amount > remainingBalance) {
+      return NextResponse.json({ 
+        error: `Payment amount (₱${amount}) exceeds remaining balance (₱${remainingBalance})` 
+      }, { status: 400 });
+    }
+    
     paymentAmount = amount;
   } else {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
