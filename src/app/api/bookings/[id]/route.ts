@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       data: {
         guestId: BigInt(guestId),
         totalPrice: Number(total_price),
-        discount: parseFloat(discount || 0),
+        discount: Number(discount || 0),
       },
     });
 
@@ -52,8 +52,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           roomId: BigInt(room.roomId),
           checkInDate: new Date(room.check_in_date),
           checkOutDate: new Date(room.check_out_date),
-          price: parseFloat(room.price),
-          discount: parseFloat(room.discount || 0),
+        price: Number(room.price),
+        discount: Number(room.discount || 0),
         }))
       });
     }
