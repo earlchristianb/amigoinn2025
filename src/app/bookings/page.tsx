@@ -31,6 +31,12 @@ export default function BookingsPage() {
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [editingPaymentAmount, setEditingPaymentAmount] = useState<string>("");
   
+  // Partial payment modal state
+  const [partialPaymentModalOpen, setPartialPaymentModalOpen] = useState<boolean>(false);
+  const [partialPaymentBookingId, setPartialPaymentBookingId] = useState<number | null>(null);
+  const [partialPaymentAmount, setPartialPaymentAmount] = useState<string>("");
+  const [partialPaymentError, setPartialPaymentError] = useState<string>("");
+  
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
@@ -261,12 +267,13 @@ export default function BookingsPage() {
     const formData = new FormData(form);
 
     // Validate that we have at least one room
-    if (bookingRooms.length === 0) {
+    // Only require rooms when creating a new booking, not when editing
+    if (bookingRooms.length === 0 && !editingBooking) {
       setError('Please add at least one room to the booking');
       return;
     }
 
-    // Validate all rooms have required fields and valid prices
+    // Validate all rooms have required fields and valid prices (only if there are rooms)
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of day for comparison
     
@@ -332,7 +339,19 @@ export default function BookingsPage() {
         body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
       });
-        const result = await response.json();
+        let result;
+        try {
+          const responseText = await response.text();
+          if (responseText) {
+            result = JSON.parse(responseText);
+          } else {
+            result = {};
+          }
+        } catch (parseError) {
+          console.error('Failed to parse response JSON:', parseError);
+          console.error('Response status:', response.status, response.statusText);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         console.log('Update booking response:', result);
         if (!response.ok) {
           throw new Error(result.error || 'Failed to update booking');
@@ -465,24 +484,50 @@ export default function BookingsPage() {
     }
   };
 
-  const handleMarkPartialPaid = async (bookingId: number) => {
-    const amount = prompt("Enter partial payment amount (₱):");
-    if (!amount) return;
+  const handleMarkPartialPaid = (bookingId: number) => {
+    setPartialPaymentBookingId(bookingId);
+    setPartialPaymentAmount("");
+    setPartialPaymentError("");
+    setPartialPaymentModalOpen(true);
+  };
+
+  const handlePartialPaymentSubmit = async () => {
+    if (!partialPaymentBookingId || !partialPaymentAmount) return;
+    
+    const amount = parseInt(partialPaymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setPartialPaymentError("Please enter a valid amount (whole numbers only)");
+      return;
+    }
+
     try {
       const response = await fetch("/api/payments", {
-      method: "POST",
-      body: JSON.stringify({ bookingId, type: "partial", amount: Number(amount) }),
-      headers: { "Content-Type": "application/json" },
-    });
+        method: "POST",
+        body: JSON.stringify({ bookingId: partialPaymentBookingId, type: "partial", amount }),
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      const data = await response.json();
+      
       if (response.ok) {
         await fetchBookings();
         toast.success(`Partial payment of ₱${amount} recorded!`);
+        setPartialPaymentModalOpen(false);
+        setPartialPaymentAmount("");
+        setPartialPaymentError("");
       } else {
-        toast.error('Failed to record partial payment');
+        setPartialPaymentError(data.error || 'Failed to record partial payment');
       }
     } catch (error) {
-      toast.error('Error processing payment');
+      setPartialPaymentError('Error processing payment');
     }
+  };
+
+  const handlePartialPaymentInputChange = (value: string) => {
+    // Only allow whole numbers (no decimals, no negative signs)
+    const cleanValue = value.replace(/[^0-9]/g, '');
+    setPartialPaymentAmount(cleanValue);
+    setPartialPaymentError("");
   };
 
   if (loading) {
@@ -591,58 +636,134 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      {/* Bookings Table */}
-      <table className="w-full border border-black">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="px-2 py-1 border border-black text-black font-bold">Guest</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Rooms</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Total Price (₱)</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Discount (₱)</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Total Paid (₱)</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Remaining (₱)</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Status</th>
-            <th className="px-2 py-1 border border-black text-black font-bold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.isArray(filteredBookings) && 
-           filteredBookings
-             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent first
-             .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) // Paginate
-             .map((b:Booking) => {
-            const isPaid = b.remaining <= 0;
-            const isPartiallyPaid = b.total_paid > 0 && b.remaining > 0;
-            return (
-            <tr 
-              key={b.id} 
-              className={`cursor-pointer hover:bg-gray-100 ${isPaid ? 'bg-gray-200' : ''}`}
-              onDoubleClick={() => {
-                setSelectedBooking(b);
-                setDetailModalOpen(true);
-              }}
-            >
-              <td className="px-2 py-1 border border-black text-black">{b.guest.name}</td>
-              <td className="px-2 py-1 border border-black">
-                <div className="space-y-1">
-                  {b.booking_rooms.map((room, index) => (
-                    <div key={room.id} className="text-sm">
-                      <div className="font-medium text-black">Room {room.room.room_number}</div>
-                      <div className="text-gray-800">
-                        {new Date(room.check_in_date).toLocaleDateString()} - {new Date(room.check_out_date).toLocaleDateString()}
+      {/* Bookings Table - Desktop View */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full border border-black">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-2 py-1 border border-black text-black font-bold">Guest</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Rooms</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Total Price (₱)</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Discount (₱)</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Total Paid (₱)</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Remaining (₱)</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Status</th>
+              <th className="px-2 py-1 border border-black text-black font-bold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.isArray(filteredBookings) && 
+             filteredBookings
+               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent first
+               .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) // Paginate
+               .map((b:Booking) => {
+              const isPaid = b.remaining <= 0;
+              const isPartiallyPaid = b.total_paid > 0 && b.remaining > 0;
+              return (
+              <tr 
+                key={b.id} 
+                className={`cursor-pointer hover:bg-gray-100 ${isPaid ? 'bg-gray-200' : ''}`}
+                onDoubleClick={() => {
+                  setSelectedBooking(b);
+                  setDetailModalOpen(true);
+                }}
+              >
+                <td className="px-2 py-1 border border-black text-black">{b.guest.name}</td>
+                <td className="px-2 py-1 border border-black">
+                  <div className="space-y-1">
+                    {b.booking_rooms.map((room, index) => (
+                      <div key={room.id} className="text-sm">
+                        <div className="font-medium text-black">Room {room.room.room_number}</div>
+                        <div className="text-gray-800">
+                          {new Date(room.check_in_date).toLocaleDateString()} - {new Date(room.check_out_date).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-700">
+                          {room.room.type?.name} (₱{room.price.toFixed(2)})
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-700">
-                        {room.room.type?.name} (₱{room.price.toFixed(2)})
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </td>
-              <td className="px-2 py-1 border border-black text-black">{b.total_price.toFixed(2)}</td>
-              <td className="px-2 py-1 border border-black text-black">{b.discount.toFixed(2)}</td>
-              <td className="px-2 py-1 border border-black text-black">{b.total_paid.toFixed(2)}</td>
-              <td className="px-2 py-1 border border-black text-black">{b.remaining.toFixed(2)}</td>
-              <td className="px-2 py-1 border border-black">
+                    ))}
+                  </div>
+                </td>
+                <td className="px-2 py-1 border border-black text-black">{b.total_price.toFixed(2)}</td>
+                <td className="px-2 py-1 border border-black text-black">{b.discount.toFixed(2)}</td>
+                <td className="px-2 py-1 border border-black text-black">{b.total_paid.toFixed(2)}</td>
+                <td className="px-2 py-1 border border-black text-black">{b.remaining.toFixed(2)}</td>
+                <td className="px-2 py-1 border border-black">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    isPaid ? 'bg-gray-600 text-white' : 
+                    isPartiallyPaid ? 'bg-yellow-100 text-yellow-800' : 
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {isPaid ? 'Paid' : isPartiallyPaid ? 'Partial' : 'Unpaid'}
+                  </span>
+                </td>
+                <td className="px-2 py-1 border border-black text-center">
+                  <button
+                    className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mx-1"
+                    onClick={() => openModal(b)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mx-1"
+                    onClick={() => handleDeleteBooking(Number(b.id))}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    className={`px-2 py-1 rounded mx-1 ${
+                      isPaid 
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                    onClick={() => handleMarkPaid(Number(b.id))}
+                    disabled={isPaid}
+                  >
+                    Mark Paid
+                  </button>
+                  <button
+                    className={`px-2 py-1 rounded mx-1 ${
+                      isPaid 
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-yellow-400 text-white hover:bg-yellow-500'
+                    }`}
+                    onClick={() => handleMarkPartialPaid(Number(b.id))}
+                    disabled={isPaid}
+                  >
+                    Partial Paid
+                  </button>
+                </td>
+              </tr>
+            );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bookings Cards - Mobile View */}
+      <div className="lg:hidden space-y-4">
+        {Array.isArray(filteredBookings) && 
+         filteredBookings
+           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent first
+           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) // Paginate
+           .map((b:Booking) => {
+          const isPaid = b.remaining <= 0;
+          const isPartiallyPaid = b.total_paid > 0 && b.remaining > 0;
+          return (
+          <div 
+            key={b.id} 
+            className={`bg-white border border-gray-300 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
+              isPaid ? 'bg-gray-50' : ''
+            }`}
+            onDoubleClick={() => {
+              setSelectedBooking(b);
+              setDetailModalOpen(true);
+            }}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900">{b.guest.name}</h3>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                   isPaid ? 'bg-gray-600 text-white' : 
                   isPartiallyPaid ? 'bg-yellow-100 text-yellow-800' : 
@@ -650,48 +771,88 @@ export default function BookingsPage() {
                 }`}>
                   {isPaid ? 'Paid' : isPartiallyPaid ? 'Partial' : 'Unpaid'}
                 </span>
-              </td>
-              <td className="px-2 py-1 border border-black text-center">
-                <button
-                  className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mx-1"
-                  onClick={() => openModal(b)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mx-1"
-                  onClick={() => handleDeleteBooking(Number(b.id))}
-                >
-                  Delete
-                </button>
-                <button
-                  className={`px-2 py-1 rounded mx-1 ${
-                    isPaid 
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
-                  onClick={() => handleMarkPaid(Number(b.id))}
-                  disabled={isPaid}
-                >
-                  Mark Paid
-                </button>
-                <button
-                  className={`px-2 py-1 rounded mx-1 ${
-                    isPaid 
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                      : 'bg-yellow-400 text-white hover:bg-yellow-500'
-                  }`}
-                  onClick={() => handleMarkPartialPaid(Number(b.id))}
-                  disabled={isPaid}
-                >
-                  Partial Paid
-                </button>
-              </td>
-            </tr>
-          );
-          })}
-        </tbody>
-      </table>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-gray-600">Total</div>
+                <div className="font-bold text-lg">₱{b.total_price.toFixed(2)}</div>
+              </div>
+            </div>
+
+            {/* Rooms */}
+            <div className="mb-3">
+              <div className="text-sm font-medium text-gray-700 mb-2">Rooms:</div>
+              <div className="space-y-2">
+                {b.booking_rooms.map((room, index) => (
+                  <div key={room.id} className="bg-gray-50 p-2 rounded text-sm">
+                    <div className="font-medium text-gray-900">Room {room.room.room_number}</div>
+                    <div className="text-gray-600">
+                      {new Date(room.check_in_date).toLocaleDateString()} - {new Date(room.check_out_date).toLocaleDateString()}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {room.room.type?.name} • ₱{room.price.toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment Details */}
+            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+              <div>
+                <div className="text-gray-600">Discount</div>
+                <div className="font-medium">₱{b.discount.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Total Paid</div>
+                <div className="font-medium">₱{b.total_paid.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Remaining</div>
+                <div className="font-medium">₱{b.remaining.toFixed(2)}</div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
+                onClick={() => openModal(b)}
+              >
+                Edit
+              </button>
+              <button
+                className="flex-1 px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                onClick={() => handleDeleteBooking(Number(b.id))}
+              >
+                Delete
+              </button>
+              <button
+                className={`flex-1 px-3 py-2 rounded text-sm ${
+                  isPaid 
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+                onClick={() => handleMarkPaid(Number(b.id))}
+                disabled={isPaid}
+              >
+                Mark Paid
+              </button>
+              <button
+                className={`flex-1 px-3 py-2 rounded text-sm ${
+                  isPaid 
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-yellow-400 text-white hover:bg-yellow-500'
+                }`}
+                onClick={() => handleMarkPartialPaid(Number(b.id))}
+                disabled={isPaid}
+              >
+                Partial Paid
+              </button>
+            </div>
+          </div>
+        );
+        })}
+      </div>
 
       {/* Pagination Controls */}
       <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-lg border border-gray-200">
@@ -1253,6 +1414,53 @@ export default function BookingsPage() {
               >
                 Edit Booking
               </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Partial Payment Modal */}
+      <Dialog open={partialPaymentModalOpen} onClose={() => setPartialPaymentModalOpen(false)} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white rounded-xl shadow p-6 w-full max-w-md">
+            <Dialog.Title className="text-xl font-bold mb-4 text-black">
+              Add Partial Payment
+            </Dialog.Title>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment Amount (₱)
+                </label>
+                <input
+                  type="text"
+                  value={partialPaymentAmount}
+                  onChange={(e) => handlePartialPaymentInputChange(e.target.value)}
+                  placeholder="Enter amount (whole numbers only)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {partialPaymentError && (
+                  <p className="text-red-600 text-sm mt-1">{partialPaymentError}</p>
+                )}
+              </div>
+              
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handlePartialPaymentSubmit}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Record Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartialPaymentModalOpen(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </Dialog.Panel>
         </div>
