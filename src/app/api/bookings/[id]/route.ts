@@ -2,22 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const { guestId, booking_rooms, booking_extras, total_price, discount } = await req.json();
+  try {
+    const { id } = await params;
+    const { guestId, booking_rooms, booking_extras, total_price, discount } = await req.json();
 
-  if (!guestId || !booking_rooms || !Array.isArray(booking_rooms) || booking_rooms.length === 0 || !total_price) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
+    console.log('PUT /api/bookings/[id] - Received data:', { id, guestId, booking_rooms, total_price, discount });
 
-  // Validate each booking room
-  for (const room of booking_rooms) {
-    if (!room.roomId || !room.check_in_date || !room.check_out_date || !room.price) {
-      return NextResponse.json({ error: "Missing required room fields" }, { status: 400 });
+    if (!guestId || !booking_rooms || !Array.isArray(booking_rooms) || !total_price) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
-  }
 
-  // Use transaction to update booking and its rooms
-  const booking = await prisma.$transaction(async (tx: any) => {
+    // Allow empty room array (user removing all rooms)
+    if (booking_rooms.length === 0) {
+      console.log('Warning: Booking update with no rooms - this will remove all rooms from the booking');
+    }
+
+    // Validate each booking room
+    for (const room of booking_rooms) {
+      if (!room.roomId || !room.check_in_date || !room.check_out_date || !room.price) {
+        return NextResponse.json({ error: "Missing required room fields" }, { status: 400 });
+      }
+    }
+
+    // Use transaction to update booking and its rooms
+    const booking = await prisma.$transaction(async (tx: any) => {
     // Delete existing booking rooms and extras
     await tx.bookingRoom.deleteMany({
       where: { bookingId: BigInt(id) }
@@ -32,21 +40,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       data: {
         guestId: BigInt(guestId),
         totalPrice: Number(total_price),
-        discount: Number(discount || 0),
+        discount: parseFloat(discount || 0),
       },
     });
 
-    // Create new booking rooms
-    await tx.bookingRoom.createMany({
-      data: booking_rooms.map(room => ({
-        bookingId: BigInt(id),
-        roomId: BigInt(room.roomId),
-        checkInDate: new Date(room.check_in_date),
-        checkOutDate: new Date(room.check_out_date),
-        price: Number(room.price),
-        discount: Number(room.discount || 0),
-      }))
-    });
+    // Create new booking rooms (only if there are rooms)
+    if (booking_rooms.length > 0) {
+      await tx.bookingRoom.createMany({
+        data: booking_rooms.map(room => ({
+          bookingId: BigInt(id),
+          roomId: BigInt(room.roomId),
+          checkInDate: new Date(room.check_in_date),
+          checkOutDate: new Date(room.check_out_date),
+          price: parseFloat(room.price),
+          discount: parseFloat(room.discount || 0),
+        }))
+      });
+    }
 
     // Create new booking extras if provided
     if (booking_extras && booking_extras.length > 0) {
@@ -141,6 +151,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     total_paid: totalPaid,
     remaining: remaining < 0 ? 0 : remaining,
   });
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    return NextResponse.json({ 
+      error: "Failed to update booking", 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

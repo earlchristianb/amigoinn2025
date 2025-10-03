@@ -231,8 +231,8 @@ export async function POST(req: NextRequest) {
         roomId: roomIdBigInt,
         checkInDate: checkInDate,
         checkOutDate: checkOutDate,
-        price: Number(room.price),
-        discount: Number(room.discount || 0),
+        price: parseFloat(room.price),
+        discount: parseFloat(room.discount || 0),
       };
     });
 
@@ -304,8 +304,8 @@ export async function POST(req: NextRequest) {
     const booking = await prisma.booking.create({
       data: {
         guestId: guestIdBigInt,
-        totalPrice: Number(total_price),
-        discount: Number(discount || 0),
+        totalPrice: parseFloat(total_price),
+        discount: parseFloat(discount || 0),
         bookingRooms: {
           create: validatedRooms
         },
