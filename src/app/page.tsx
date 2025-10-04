@@ -18,6 +18,7 @@ export default function Home() {
   const [rooms, setRooms] = useState<RoomAvailability[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string>("");
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingEvent | null>(null);
@@ -51,13 +52,40 @@ export default function Home() {
         
         const res = await fetch(`/api/availability?startDate=${startDate}&endDate=${endDate}`);
         
+        console.log('API response status:', res.status);
+        console.log('API response headers:', res.headers);
+        
         if (!res.ok) {
           console.error("API request failed with status:", res.status);
+          const errorText = await res.text();
+          console.error("API error response:", errorText);
+          
+          // Try test endpoint as fallback
+          console.log('Trying test endpoint as fallback...');
+          try {
+            const testRes = await fetch('/api/test-availability');
+            const testData = await testRes.json();
+            console.log('Test endpoint response:', testData);
+            setAvailabilityError(`Availability API failed (${res.status}), but test endpoint works. Check deployment logs.`);
+          } catch (testError) {
+            console.error('Test endpoint also failed:', testError);
+            setAvailabilityError(`Both APIs failed. Check deployment configuration.`);
+          }
+          
           setRooms([]);
           return;
         }
         
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (jsonError) {
+          console.error('JSON parsing error:', jsonError);
+          console.error('Response text:', await res.text());
+          setAvailabilityError('Invalid response format from server');
+          setRooms([]);
+          return;
+        }
         
         console.log('Availability API response:', data);
         console.log('Data type:', typeof data);
@@ -65,12 +93,15 @@ export default function Home() {
         
         if (Array.isArray(data)) {
           setRooms(data);
+          setAvailabilityError(""); // Clear any previous errors
         } else {
           console.error('API returned non-array data:', data);
+          setAvailabilityError('Invalid data format received from server');
           setRooms([]);
         }
       } catch (error) {
         console.error("Error fetching availability:", error);
+        setAvailabilityError(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setRooms([]);
       } finally {
         setLoading(false);
@@ -245,9 +276,29 @@ export default function Home() {
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Each date shows all room numbers (101-208) with their current status
+            Each date shows all room numbers (100-208) with their current status
           </p>
         </div>
+
+        {/* Error Display */}
+        {availabilityError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Unable to load room availability</h3>
+                <div className="mt-2 text-sm text-red-700">{availabilityError}</div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
                  {/* Calendar */}
                 <div className="bg-white rounded-lg shadow-sm border p-6 relative">
