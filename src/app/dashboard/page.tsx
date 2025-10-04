@@ -271,7 +271,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">
-                    Each date shows all room numbers (101-208) as small badges with their current status
+                    Each date shows all room numbers (100-208) as small badges with their current status
                 </p>
             </div>
 
