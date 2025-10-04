@@ -55,6 +55,9 @@ export default function Home() {
         console.log('API response status:', res.status);
         console.log('API response headers:', res.headers);
         
+        // Clone the response BEFORE reading it
+        const resClone = res.clone();
+        
         if (!res.ok) {
           console.error("API request failed with status:", res.status);
           let errorText = '';
@@ -86,15 +89,14 @@ export default function Home() {
           data = await res.json();
         } catch (jsonError) {
           console.error('JSON parsing error:', jsonError);
-          // Try to get the response text for debugging
+          // Use the cloned response for debugging
           try {
-            const responseClone = res.clone();
-            const responseText = await responseClone.text();
+            const responseText = await resClone.text();
             console.error('Response text:', responseText);
-            setAvailabilityError(`Invalid JSON response. Server returned: ${responseText.substring(0, 100)}...`);
+            setAvailabilityError(`Invalid JSON response. Server returned HTML instead of JSON. Check if API route is deployed correctly.`);
           } catch (textError) {
             console.error('Could not read response text:', textError);
-            setAvailabilityError('Invalid response format from server');
+            setAvailabilityError('Invalid response format from server. API may be returning 404 or error page.');
           }
           setRooms([]);
           return;
