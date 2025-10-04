@@ -11,7 +11,16 @@ export default function ReportsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [monthFilterType, setMonthFilterType] = useState<string>("created_at"); // Default to "created_at"
   const [loading, setLoading] = useState(true);
+
+  // Utility function to format numbers with commas
+  const formatCurrency = (amount: number): string => {
+    return amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,18 +63,29 @@ export default function ReportsPage() {
   useEffect(() => {
     if (selectedMonth) {
       const filtered = bookings.filter((booking) => {
-        return booking.booking_rooms.some((room) => {
-          const checkInDate = new Date(room.check_in_date);
-          const checkOutDate = new Date(room.check_out_date);
-          const filterMonth = new Date(selectedMonth);
-
+        const filterMonth = new Date(selectedMonth);
+        
+        if (monthFilterType === "created_at") {
+          // Filter by created_at date
+          const createdAt = new Date(booking.created_at);
           return (
-            (checkInDate.getFullYear() === filterMonth.getFullYear() &&
-              checkInDate.getMonth() === filterMonth.getMonth()) ||
-            (checkOutDate.getFullYear() === filterMonth.getFullYear() &&
-              checkOutDate.getMonth() === filterMonth.getMonth())
+            createdAt.getFullYear() === filterMonth.getFullYear() && 
+            createdAt.getMonth() === filterMonth.getMonth()
           );
-        });
+        } else {
+          // Filter by check-in/check-out dates (existing logic)
+          return booking.booking_rooms.some((room) => {
+            const checkInDate = new Date(room.check_in_date);
+            const checkOutDate = new Date(room.check_out_date);
+
+            return (
+              (checkInDate.getFullYear() === filterMonth.getFullYear() &&
+                checkInDate.getMonth() === filterMonth.getMonth()) ||
+              (checkOutDate.getFullYear() === filterMonth.getFullYear() &&
+                checkOutDate.getMonth() === filterMonth.getMonth())
+            );
+          });
+        }
       });
       setFilteredBookings(filtered);
       calculateSummary(filtered);
@@ -75,7 +95,7 @@ export default function ReportsPage() {
     }
     // Reset to first page when filter changes
     setCurrentPage(1);
-  }, [selectedMonth, bookings]);
+  }, [selectedMonth, monthFilterType, bookings]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredBookings.length / pageSize);
@@ -142,11 +162,11 @@ export default function ReportsPage() {
       "Check-out Dates": booking.booking_rooms
         .map((br) => new Date(br.check_out_date).toLocaleDateString())
         .join("; "),
-      "Total Price (₱)": booking.total_price?.toFixed(2) || "0.00",
-      "Discount (₱)": booking.discount?.toFixed(2) || "0.00",
-      "Grand Total (₱)": ((booking.total_price || 0) - (booking.discount || 0)).toFixed(2),
-      "Total Paid (₱)": booking.total_paid?.toFixed(2) || "0.00",
-      "Remaining (₱)": booking.remaining?.toFixed(2) || "0.00",
+      "Total Price (₱)": formatCurrency(booking.total_price || 0),
+      "Discount (₱)": formatCurrency(booking.discount || 0),
+      "Grand Total (₱)": formatCurrency((booking.total_price || 0) - (booking.discount || 0)),
+      "Total Paid (₱)": formatCurrency(booking.total_paid || 0),
+      "Remaining (₱)": formatCurrency(booking.remaining || 0),
       "Payment Status":
         booking.remaining <= 0
           ? "Paid"
@@ -154,7 +174,7 @@ export default function ReportsPage() {
           ? "Partial"
           : "Unpaid",
       "Extras": booking.booking_extras
-        ?.map((e) => `${e.label} (${e.quantity}x ₱${e.price})`)
+        ?.map((e) => `${e.label} (${e.quantity}x ₱${formatCurrency(e.price)})`)
         .join("; ") || "None",
       "Created At": new Date(booking.created_at).toLocaleString(),
       "Updated At": new Date(booking.updated_at).toLocaleString(),
@@ -192,9 +212,9 @@ export default function ReportsPage() {
             })
           : "All Time",
         "Total Bookings": summary.totalBookings,
-        "Total Revenue (₱)": summary.totalRevenue.toFixed(2),
-        "Total Paid (₱)": summary.totalPaid.toFixed(2),
-        "Pending Payments (₱)": summary.totalPending.toFixed(2),
+        "Total Revenue (₱)": formatCurrency(summary.totalRevenue),
+        "Total Paid (₱)": formatCurrency(summary.totalPaid),
+        "Pending Payments (₱)": formatCurrency(summary.totalPending),
         "Paid Bookings": summary.paidCount,
         "Partial Payments": summary.partialCount,
         "Unpaid Bookings": summary.unpaidCount,
@@ -252,8 +272,8 @@ export default function ReportsPage() {
 
         {/* Filter Section */}
         <div className="mb-6 bg-white p-4 rounded-lg shadow border border-gray-200">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Filter by Month
               </label>
@@ -264,12 +284,27 @@ export default function ReportsPage() {
                 className="w-full border border-gray-300 rounded p-2 bg-white text-black"
               />
             </div>
-            <button
-              onClick={() => setSelectedMonth("")}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              Clear Filter
-            </button>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Filter Type
+              </label>
+              <select
+                value={monthFilterType}
+                onChange={(e) => setMonthFilterType(e.target.value)}
+                className="w-full border border-gray-300 rounded p-2 bg-white text-black"
+              >
+                <option value="created_at">Created At</option>
+                <option value="checkin_checkout">Check-in/Check-out</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => setSelectedMonth("")}
+                className="w-full md:w-auto px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                Clear Filter
+              </button>
+            </div>
           </div>
         </div>
 
@@ -281,15 +316,15 @@ export default function ReportsPage() {
           </div>
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Revenue</h3>
-            <p className="text-3xl font-bold text-green-600">₱{summary.totalRevenue.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-green-600">₱{formatCurrency(summary.totalRevenue)}</p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Paid</h3>
-            <p className="text-3xl font-bold text-blue-600">₱{summary.totalPaid.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-blue-600">₱{formatCurrency(summary.totalPaid)}</p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Pending Payments</h3>
-            <p className="text-3xl font-bold text-red-600">₱{summary.totalPending.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-red-600">₱{formatCurrency(summary.totalPending)}</p>
           </div>
         </div>
 
@@ -382,9 +417,9 @@ export default function ReportsPage() {
                     <td className="border border-black p-2 text-black">
                       {booking.booking_rooms?.map((br) => br.room?.room_number || "?").join(", ")}
                     </td>
-                    <td className="border border-black p-2 text-black">{booking.total_price?.toFixed(2)}</td>
-                    <td className="border border-black p-2 text-black">{booking.total_paid?.toFixed(2)}</td>
-                    <td className="border border-black p-2 text-black">{booking.remaining?.toFixed(2)}</td>
+                    <td className="border border-black p-2 text-black">{formatCurrency(booking.total_price || 0)}</td>
+                    <td className="border border-black p-2 text-black">{formatCurrency(booking.total_paid || 0)}</td>
+                    <td className="border border-black p-2 text-black">{formatCurrency(booking.remaining || 0)}</td>
                     <td className="border border-black p-2 text-black">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         booking.remaining <= 0 ? 'bg-gray-600 text-white' :

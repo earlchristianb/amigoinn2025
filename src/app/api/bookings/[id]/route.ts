@@ -24,6 +24,98 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Validate dates and check for conflicts (including same guest overlapping bookings)
+    const guestIdBigInt = BigInt(guestId);
+    
+    for (const room of booking_rooms) {
+      const checkInDate = new Date(room.check_in_date);
+      const checkOutDate = new Date(room.check_out_date);
+      
+      if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+        return NextResponse.json({ error: `Invalid date format for room ${room.roomId}` }, { status: 400 });
+      }
+
+      if (checkInDate >= checkOutDate) {
+        return NextResponse.json({ error: `Check-out date must be after check-in date for room ${room.roomId}` }, { status: 400 });
+      }
+
+      // Check for existing bookings that would conflict (excluding current booking)
+      const existingBookings = await prisma.bookingRoom.findMany({
+        where: {
+          roomId: BigInt(room.roomId),
+          bookingId: { not: BigInt(id) }, // Exclude current booking
+          OR: [
+            // New booking starts during existing booking
+            {
+              AND: [
+                { checkInDate: { lte: checkInDate } },
+                { checkOutDate: { gt: checkInDate } }
+              ]
+            },
+            // New booking ends during existing booking
+            {
+              AND: [
+                { checkInDate: { lt: checkOutDate } },
+                { checkOutDate: { gte: checkOutDate } }
+              ]
+            },
+            // New booking completely contains existing booking
+            {
+              AND: [
+                { checkInDate: { gte: checkInDate } },
+                { checkOutDate: { lte: checkOutDate } }
+              ]
+            },
+            // Existing booking completely contains new booking
+            {
+              AND: [
+                { checkInDate: { lte: checkInDate } },
+                { checkOutDate: { gte: checkOutDate } }
+              ]
+            }
+          ]
+        },
+        include: {
+          room: true,
+          booking: {
+            include: {
+              guest: true
+            }
+          }
+        }
+      });
+
+      // Check if the same guest is trying to book overlapping dates for the same room
+      const sameGuestConflicts = existingBookings.filter(booking => 
+        booking.booking.guestId === guestIdBigInt
+      );
+
+      if (sameGuestConflicts.length > 0) {
+        const conflictingBooking = sameGuestConflicts[0];
+        const roomNumber = conflictingBooking.room.roomNumber;
+        const guestName = conflictingBooking.booking.guest.name;
+        const existingCheckIn = conflictingBooking.checkInDate.toLocaleDateString();
+        const existingCheckOut = conflictingBooking.checkOutDate.toLocaleDateString();
+        const newCheckIn = checkInDate.toLocaleDateString();
+        const newCheckOut = checkOutDate.toLocaleDateString();
+        
+        return NextResponse.json({ 
+          error: `Guest ${guestName} already has another booking for Room ${roomNumber} that overlaps with the requested dates. Existing booking: ${existingCheckIn} to ${existingCheckOut}. Requested: ${newCheckIn} to ${newCheckOut}` 
+        }, { status: 400 });
+      }
+
+      // Check for general conflicts with other guests
+      if (existingBookings.length > 0) {
+        const conflictDetails = existingBookings.map((eb: any) => 
+          `Room ${eb.room.roomNumber} is already booked by ${eb.booking.guest.name} from ${eb.checkInDate.toLocaleDateString()} to ${eb.checkOutDate.toLocaleDateString()}`
+        ).join('; ');
+        
+        return NextResponse.json({ 
+          error: `Room booking conflicts detected: ${conflictDetails}` 
+        }, { status: 400 });
+      }
+    }
+
     // Use transaction to update booking and its rooms
     const booking = await prisma.$transaction(async (tx: any) => {
     // Delete existing booking rooms and extras

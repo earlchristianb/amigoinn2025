@@ -292,6 +292,25 @@ export async function POST(req: NextRequest) {
         }
       });
 
+      // Check if the same guest is trying to book overlapping dates for the same room
+      const sameGuestConflicts = existingBookings.filter(booking => 
+        booking.booking.guestId === guestIdBigInt
+      );
+
+      if (sameGuestConflicts.length > 0) {
+        const conflictingBooking = sameGuestConflicts[0];
+        const roomNumber = conflictingBooking.room.roomNumber;
+        const guestName = conflictingBooking.booking.guest.name;
+        const existingCheckIn = conflictingBooking.checkInDate.toLocaleDateString();
+        const existingCheckOut = conflictingBooking.checkOutDate.toLocaleDateString();
+        const newCheckIn = room.checkInDate.toLocaleDateString();
+        const newCheckOut = room.checkOutDate.toLocaleDateString();
+        
+        return NextResponse.json({ 
+          error: `Guest ${guestName} already has a booking for Room ${roomNumber} that overlaps with the requested dates. Existing booking: ${existingCheckIn} to ${existingCheckOut}. Requested: ${newCheckIn} to ${newCheckOut}` 
+        }, { status: 400 });
+      }
+
       if (existingBookings.length > 0) {
         const conflictDetails = existingBookings.map((eb:any) => 
           `Room ${eb.room.roomNumber} is already booked by ${eb.booking.guest.name} from ${eb.checkInDate.toLocaleDateString()} to ${eb.checkOutDate.toLocaleDateString()}`
