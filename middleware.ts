@@ -14,7 +14,7 @@ const isProtectedRoute = createRouteMatcher([
   '/api/rooms(.*)',
   '/api/room-types(.*)',
   '/api/payments(.*)',
-  '/api/availability(.*)',
+  // Note: /api/availability is NOT protected - it's used by the public homepage
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
