@@ -353,10 +353,12 @@ export default function BookingsPage() {
       })),
       booking_extras: bookingExtras,
       total_price: totalPrice,
-      discount: Number(bookingDiscount || 0),
+      discount: bookingDiscount === '' ? 0 : Number(bookingDiscount),
     };
 
     console.log('Submitting booking with payload:', payload);
+    console.log('Booking discount value:', bookingDiscount, 'Type:', typeof bookingDiscount);
+    console.log('Converted discount:', bookingDiscount === '' ? 0 : Number(bookingDiscount));
 
     try {
     if (editingBooking) {
