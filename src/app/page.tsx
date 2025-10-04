@@ -57,8 +57,13 @@ export default function Home() {
         
         if (!res.ok) {
           console.error("API request failed with status:", res.status);
-          const errorText = await res.text();
-          console.error("API error response:", errorText);
+          let errorText = '';
+          try {
+            errorText = await res.text();
+            console.error("API error response:", errorText);
+          } catch (textError) {
+            console.error("Could not read error response:", textError);
+          }
           
           // Try test endpoint as fallback
           console.log('Trying test endpoint as fallback...');
@@ -81,8 +86,16 @@ export default function Home() {
           data = await res.json();
         } catch (jsonError) {
           console.error('JSON parsing error:', jsonError);
-          console.error('Response text:', await res.text());
-          setAvailabilityError('Invalid response format from server');
+          // Try to get the response text for debugging
+          try {
+            const responseClone = res.clone();
+            const responseText = await responseClone.text();
+            console.error('Response text:', responseText);
+            setAvailabilityError(`Invalid JSON response. Server returned: ${responseText.substring(0, 100)}...`);
+          } catch (textError) {
+            console.error('Could not read response text:', textError);
+            setAvailabilityError('Invalid response format from server');
+          }
           setRooms([]);
           return;
         }
