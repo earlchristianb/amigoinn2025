@@ -19,11 +19,13 @@ export default function BookingsPage() {
   const [bookingRooms, setBookingRooms] = useState<CreateBookingRoomRequest[]>([]);
   const [bookingExtras, setBookingExtras] = useState<CreateBookingExtraRequest[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
+  const [bookingDiscount, setBookingDiscount] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   
   // Filter states
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [monthFilterType, setMonthFilterType] = useState<string>("created_at"); // Default to "created_at"
   const [selectedGuest, setSelectedGuest] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   
@@ -36,6 +38,11 @@ export default function BookingsPage() {
   const [partialPaymentBookingId, setPartialPaymentBookingId] = useState<number | null>(null);
   const [partialPaymentAmount, setPartialPaymentAmount] = useState<string>("");
   const [partialPaymentError, setPartialPaymentError] = useState<string>("");
+  
+  // Loading states for preventing double submissions
+  const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
+  const [processingPayment, setProcessingPayment] = useState<boolean>(false);
+  const [deletingBooking, setDeletingBooking] = useState<boolean>(false);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -122,19 +129,30 @@ export default function BookingsPage() {
     // Filter by month
     if (selectedMonth) {
       filtered = filtered.filter(booking => {
-        return booking.booking_rooms.some(room => {
-          const checkInDate = new Date(room.check_in_date);
-          const checkOutDate = new Date(room.check_out_date);
-          const filterMonth = new Date(selectedMonth);
-          
-          // Check if the booking overlaps with the selected month
+        const filterMonth = new Date(selectedMonth);
+        
+        if (monthFilterType === "created_at") {
+          // Filter by created_at date
+          const createdAt = new Date(booking.created_at);
           return (
-            (checkInDate.getFullYear() === filterMonth.getFullYear() && 
-             checkInDate.getMonth() === filterMonth.getMonth()) ||
-            (checkOutDate.getFullYear() === filterMonth.getFullYear() && 
-             checkOutDate.getMonth() === filterMonth.getMonth())
+            createdAt.getFullYear() === filterMonth.getFullYear() && 
+            createdAt.getMonth() === filterMonth.getMonth()
           );
-        });
+        } else {
+          // Filter by check-in/check-out dates (existing logic)
+          return booking.booking_rooms.some(room => {
+            const checkInDate = new Date(room.check_in_date);
+            const checkOutDate = new Date(room.check_out_date);
+            
+            // Check if the booking overlaps with the selected month
+            return (
+              (checkInDate.getFullYear() === filterMonth.getFullYear() && 
+               checkInDate.getMonth() === filterMonth.getMonth()) ||
+              (checkOutDate.getFullYear() === filterMonth.getFullYear() && 
+               checkOutDate.getMonth() === filterMonth.getMonth())
+            );
+          });
+        }
       });
     }
 
@@ -226,7 +244,7 @@ export default function BookingsPage() {
   useEffect(() => {
     applyFilters();
     setCurrentPage(1); // Reset to first page when filters change
-  }, [bookings, selectedMonth, selectedGuest, selectedStatus]);
+  }, [bookings, selectedMonth, monthFilterType, selectedGuest, selectedStatus]);
 
 
   // Open modal
@@ -243,6 +261,9 @@ export default function BookingsPage() {
       }));
       setBookingRooms(rooms);
       
+      // Set booking discount
+      setBookingDiscount(booking.discount === 0 ? '' : booking.discount.toString());
+      
       // Convert booking extras to the form format
       const extras = booking.booking_extras?.map(ex => ({
         label: ex.label,
@@ -256,6 +277,7 @@ export default function BookingsPage() {
       setBookingRooms([]);
       setBookingExtras([]);
       setTotalPrice(0);
+      setBookingDiscount("");
     }
     setModalOpen(true);
   };
@@ -263,6 +285,10 @@ export default function BookingsPage() {
   // Submit booking form
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (submittingBooking) return; // Prevent double submission
+    
+    setSubmittingBooking(true);
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
@@ -327,7 +353,7 @@ export default function BookingsPage() {
       })),
       booking_extras: bookingExtras,
       total_price: totalPrice,
-      discount: Number(formData.get("discount") || 0),
+      discount: Number(bookingDiscount || 0),
     };
 
     console.log('Submitting booking with payload:', payload);
@@ -383,12 +409,18 @@ export default function BookingsPage() {
       const errorMsg = 'Failed to save booking: ' + (error as Error).message;
       setError(errorMsg);
       toast.error(errorMsg);
+    } finally {
+      setSubmittingBooking(false);
     }
   };
 
   // Delete booking
   const handleDeleteBooking = async (id: number) => {
     if (!confirm("Delete this booking?")) return;
+    
+    if (deletingBooking) return; // Prevent double submission
+    
+    setDeletingBooking(true);
     try {
       const response = await fetch(`/api/bookings/${id}`, { method: "DELETE" });
       if (response.ok) {
@@ -399,6 +431,8 @@ export default function BookingsPage() {
       }
     } catch (error) {
       toast.error('Error deleting booking');
+    } finally {
+      setDeletingBooking(false);
     }
   };
 
@@ -467,6 +501,9 @@ export default function BookingsPage() {
 
   // Payment actions
   const handleMarkPaid = async (bookingId: number) => {
+    if (processingPayment) return; // Prevent double submission
+    
+    setProcessingPayment(true);
     try {
       const response = await fetch("/api/payments", {
       method: "POST",
@@ -481,6 +518,8 @@ export default function BookingsPage() {
       }
     } catch (error) {
       toast.error('Error processing payment');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -494,12 +533,15 @@ export default function BookingsPage() {
   const handlePartialPaymentSubmit = async () => {
     if (!partialPaymentBookingId || !partialPaymentAmount) return;
     
+    if (processingPayment) return; // Prevent double submission
+    
     const amount = parseInt(partialPaymentAmount);
     if (isNaN(amount) || amount <= 0) {
       setPartialPaymentError("Please enter a valid amount (whole numbers only)");
       return;
     }
 
+    setProcessingPayment(true);
     try {
       const response = await fetch("/api/payments", {
         method: "POST",
@@ -520,6 +562,8 @@ export default function BookingsPage() {
       }
     } catch (error) {
       setPartialPaymentError('Error processing payment');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -574,7 +618,7 @@ export default function BookingsPage() {
 
       {/* Filters */}
       <div className="mb-4 bg-white p-4 rounded-lg shadow border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Filter by Month
@@ -585,6 +629,19 @@ export default function BookingsPage() {
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-full border border-gray-300 rounded p-2 bg-white text-black"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Filter Type
+            </label>
+            <select
+              value={monthFilterType}
+              onChange={(e) => setMonthFilterType(e.target.value)}
+              className="w-full border border-gray-300 rounded p-2 bg-white text-black"
+            >
+              <option value="created_at">Created At</option>
+              <option value="checkin_checkout">Check-in/Check-out</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -705,32 +762,37 @@ export default function BookingsPage() {
                     Edit
                   </button>
                   <button
-                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mx-1"
+                    disabled={deletingBooking}
+                    className={`px-2 py-1 rounded mx-1 ${
+                      deletingBooking 
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-red-500 text-white hover:bg-red-600'
+                    }`}
                     onClick={() => handleDeleteBooking(Number(b.id))}
                   >
-                    Delete
+                    {deletingBooking ? 'Deleting...' : 'Delete'}
                   </button>
                   <button
                     className={`px-2 py-1 rounded mx-1 ${
-                      isPaid 
+                      isPaid || processingPayment
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                         : 'bg-green-500 text-white hover:bg-green-600'
                     }`}
                     onClick={() => handleMarkPaid(Number(b.id))}
-                    disabled={isPaid}
+                    disabled={isPaid || processingPayment}
                   >
-                    Mark Paid
+                    {processingPayment ? 'Processing...' : 'Mark Paid'}
                   </button>
                   <button
                     className={`px-2 py-1 rounded mx-1 ${
-                      isPaid 
+                      isPaid || processingPayment
                         ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                         : 'bg-yellow-400 text-white hover:bg-yellow-500'
                     }`}
                     onClick={() => handleMarkPartialPaid(Number(b.id))}
-                    disabled={isPaid}
+                    disabled={isPaid || processingPayment}
                   >
-                    Partial Paid
+                    {processingPayment ? 'Processing...' : 'Partial Paid'}
                   </button>
                 </td>
               </tr>
@@ -821,32 +883,37 @@ export default function BookingsPage() {
                 Edit
               </button>
               <button
-                className="flex-1 px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                disabled={deletingBooking}
+                className={`flex-1 px-3 py-2 rounded text-sm ${
+                  deletingBooking 
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-red-500 text-white hover:bg-red-600'
+                }`}
                 onClick={() => handleDeleteBooking(Number(b.id))}
               >
-                Delete
+                {deletingBooking ? 'Deleting...' : 'Delete'}
               </button>
               <button
                 className={`flex-1 px-3 py-2 rounded text-sm ${
-                  isPaid 
+                  isPaid || processingPayment
                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                     : 'bg-green-500 text-white hover:bg-green-600'
                 }`}
                 onClick={() => handleMarkPaid(Number(b.id))}
-                disabled={isPaid}
+                disabled={isPaid || processingPayment}
               >
-                Mark Paid
+                {processingPayment ? 'Processing...' : 'Mark Paid'}
               </button>
               <button
                 className={`flex-1 px-3 py-2 rounded text-sm ${
-                  isPaid 
+                  isPaid || processingPayment
                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                     : 'bg-yellow-400 text-white hover:bg-yellow-500'
                 }`}
                 onClick={() => handleMarkPartialPaid(Number(b.id))}
-                disabled={isPaid}
+                disabled={isPaid || processingPayment}
               >
-                Partial Paid
+                {processingPayment ? 'Processing...' : 'Partial Paid'}
               </button>
             </div>
           </div>
@@ -1071,10 +1138,15 @@ export default function BookingsPage() {
                         <label className="block text-sm font-medium text-black mb-1">Discount (₱)</label>
                         <input
                           type="number"
-                          step="0.01"
-                          value={room.discount || 0}
-                          onChange={(e) => updateRoom(index, 'discount', Number(e.target.value))}
+                          step="1"
+                          min="0"
+                          value={room.discount === 0 ? '' : room.discount}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? 0 : Math.floor(Number(e.target.value));
+                            updateRoom(index, 'discount', value);
+                          }}
                           className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
+                          placeholder="0"
                         />
                       </div>
                     </div>
@@ -1167,11 +1239,16 @@ export default function BookingsPage() {
               <div>
                 <label className="block font-semibold mb-1 text-black">Booking Discount (₱)</label>
                 <input
-                  name="discount"
                   type="number"
-                  step="0.01"
-                  defaultValue={editingBooking?.discount || 0}
+                  step="1"
+                  min="0"
+                  value={bookingDiscount}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? '' : Math.floor(Number(e.target.value)).toString();
+                    setBookingDiscount(value);
+                  }}
                   className="w-full border border-gray-300 rounded p-2 bg-white text-black"
+                  placeholder="0"
                 />
               </div>
 
@@ -1185,9 +1262,14 @@ export default function BookingsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  disabled={submittingBooking}
+                  className={`px-3 py-1 rounded ${
+                    submittingBooking 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
                 >
-                  {editingBooking ? "Update" : "Add"}
+                  {submittingBooking ? 'Saving...' : (editingBooking ? "Update" : "Add")}
                 </button>
               </div>
             </form>
@@ -1448,10 +1530,15 @@ export default function BookingsPage() {
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"
+                  disabled={processingPayment}
                   onClick={handlePartialPaymentSubmit}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  className={`flex-1 px-4 py-2 rounded-md transition-colors ${
+                    processingPayment 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
                 >
-                  Record Payment
+                  {processingPayment ? 'Recording...' : 'Record Payment'}
                 </button>
                 <button
                   type="button"

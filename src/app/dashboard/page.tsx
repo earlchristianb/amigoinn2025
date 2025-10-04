@@ -15,6 +15,7 @@ export default function DashboardPage() {
     const [rooms, setRooms] = useState<Room[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date()); // Track current month view
+    const [loadingBookings, setLoadingBookings] = useState(false);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<BookingEvent | null>(null);
@@ -49,6 +50,7 @@ export default function DashboardPage() {
     // Fetch bookings and create room availability events
     useEffect(() => {
         async function fetchBookings() {
+            setLoadingBookings(true);
             try {
                 // Get first day of selected month
                 const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
@@ -155,6 +157,8 @@ export default function DashboardPage() {
             } catch (error) {
                 console.error('Error fetching bookings:', error);
                 setEvents([]);
+            } finally {
+                setLoadingBookings(false);
             }
         }
         fetchBookings();
@@ -272,7 +276,16 @@ export default function DashboardPage() {
             </div>
 
             {/* FullCalendar */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-4 relative">
+                {/* Loading Overlay */}
+                {loadingBookings && (
+                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p className="text-gray-600 font-medium">Loading bookings...</p>
+                        </div>
+                    </div>
+                )}
                 <style>{`
                     .fc-daygrid-event-harness {
                         margin: 0 !important;
@@ -316,6 +329,55 @@ export default function DashboardPage() {
                     .fc-button {
                         color: #ffffff !important;
                     }
+                    .fc-toolbar-chunk {
+                        display: flex !important;
+                        align-items: center !important;
+                        gap: 8px !important;
+                    }
+                    .fc-prev-button, .fc-next-button {
+                        background-color: #3b82f6 !important;
+                        border-color: #3b82f6 !important;
+                        padding: 8px 16px !important;
+                        font-size: 14px !important;
+                        border-radius: 6px !important;
+                    }
+                    .fc-prev-button:hover, .fc-next-button:hover {
+                        background-color: #2563eb !important;
+                        border-color: #2563eb !important;
+                    }
+                    .fc-toolbar-title {
+                        font-size: 18px !important;
+                        font-weight: 600 !important;
+                        color: #1f2937 !important;
+                    }
+                    @media (max-width: 768px) {
+                        .fc-toolbar {
+                            display: flex !important;
+                            justify-content: space-between !important;
+                            align-items: center !important;
+                            padding: 16px 0 !important;
+                        }
+                        .fc-toolbar-chunk {
+                            flex: 1 !important;
+                            display: flex !important;
+                            justify-content: center !important;
+                        }
+                        .fc-toolbar-chunk:first-child {
+                            justify-content: flex-start !important;
+                        }
+                        .fc-toolbar-chunk:last-child {
+                            justify-content: flex-end !important;
+                        }
+                        .fc-toolbar-title {
+                            font-size: 20px !important;
+                            margin: 0 !important;
+                        }
+                        .fc-prev-button, .fc-next-button {
+                            padding: 10px 16px !important;
+                            font-size: 14px !important;
+                            min-width: 80px !important;
+                        }
+                    }
                 `}</style>
                 <FullCalendar
                     key={currentMonth.toISOString()}
@@ -337,9 +399,13 @@ export default function DashboardPage() {
                         }
                     }}
                     headerToolbar={{
-                        left: 'prev,next today',
+                        left: 'prev',
                         center: 'title',
-                        right: 'dayGridMonth,dayGridWeek'
+                        right: 'next'
+                    }}
+                    buttonText={{
+                        prev: 'Previous',
+                        next: 'Next'
                     }}
                     eventDisplay="block"
                     dayMaxEvents={false}
