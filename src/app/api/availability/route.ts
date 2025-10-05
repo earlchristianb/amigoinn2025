@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { BookingRoom, Room, RoomAvailability } from "@/types";
 
 export async function GET(req: Request) {
+  console.log('[Availability API] Request received');
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("startDate");
@@ -90,9 +91,18 @@ export async function GET(req: Request) {
     return NextResponse.json(availabilityData);
   } catch (error) {
     console.error('Error fetching availability:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('Environment check:', {
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      nodeEnv: process.env.NODE_ENV,
+      prismaClient: !!prisma
+    });
+    
     return NextResponse.json({ 
       error: "Failed to fetch availability", 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
     }, { status: 500 });
   }
 }
