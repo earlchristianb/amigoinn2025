@@ -225,64 +225,78 @@ export default function DashboardPage() {
 
     return (
         <AdminAuthGuard>
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
             <AdminNavigation currentPage="dashboard" />
 
             {/* Main Content */}
             <main className="p-6">
                 {/* Page Header */}
-                <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">📅 Bookings Dashboard</h2>
-                    <p className="text-gray-700 mt-1">Manage your hotel bookings and room availability</p>
+                <div className="mb-8">
+                    <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">📅 Bookings Dashboard</h2>
+                    <p className="text-gray-700 text-lg">Manage your hotel bookings and room availability 🏨</p>
                 </div>
 
             {/* Room Filter */}
-            <div className="mb-4">
-                <label className="mr-2 font-semibold text-gray-800">Filter by Room:</label>
-                <select
-                    className="border border-gray-300 rounded p-2 bg-white text-gray-800"
-                    value={selectedRoom ?? ""}
-                    onChange={(e) => setSelectedRoom(e.target.value || null)}
-                >
-                    <option value="">All Rooms</option>
-                    {Array.isArray(rooms) && rooms.map((room) => (
-                        <option key={room.id} value={room.id}>
-                            {room.room_number} ({room.type?.name || 'Unknown'})
-                        </option>
-                    ))}
-                </select>
+            <div className="mb-6">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-stone-200">
+                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                        🔍 Filter by Room
+                    </label>
+                    <select
+                        className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+                        value={selectedRoom ?? ""}
+                        onChange={(e) => setSelectedRoom(e.target.value || null)}
+                    >
+                        <option value="">All Rooms</option>
+                        {Array.isArray(rooms) && rooms.map((room) => (
+                            <option key={room.id} value={room.id}>
+                                {room.room_number} ({room.type?.name || 'Unknown'})
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* Room Status Legend */}
             <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3 text-gray-800">Room Status Legend</h3>
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-green-500 rounded text-white text-xs font-bold px-1 py-0.5">101</div>
-                        <span className="text-sm text-gray-700">Available</span>
+                <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-2xl shadow-lg p-6 border border-stone-200">
+                    <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
+                        <span className="text-2xl">📊</span> Room Status Legend
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-6">
+                        <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                            <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg text-white text-xs flex items-center justify-center font-bold shadow-md">101</div>
+                            <span className="text-sm font-semibold text-gray-800">Available</span>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                            <div className="w-8 h-8 bg-gradient-to-br from-red-400 to-red-600 rounded-lg text-white text-xs flex items-center justify-center font-bold shadow-md">102</div>
+                            <span className="text-sm font-semibold text-gray-800">Booked</span>
+                        </div>
+                        <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                            <div className="w-8 h-8 bg-gradient-to-br from-gray-300 to-gray-400 rounded-lg text-gray-700 text-xs flex items-center justify-center font-bold shadow-md">103</div>
+                            <span className="text-sm font-semibold text-gray-800">Unavailable</span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="bg-red-500 rounded text-white text-xs font-bold px-1 py-0.5">102</div>
-                        <span className="text-sm text-gray-700">Booked</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="bg-gray-300 rounded text-gray-600 text-xs font-bold px-1 py-0.5">103</div>
-                        <span className="text-sm text-gray-700">Unavailable</span>
-                    </div>
+                    <p className="text-sm text-gray-700 mt-4 bg-white/50 rounded-lg px-4 py-2 border border-stone-100">
+                        💡 Each date shows all room numbers (100-208) with their current status
+                    </p>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                    Each date shows all room numbers (100-208) as small badges with their current status
-                </p>
             </div>
 
             {/* FullCalendar */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-4 relative">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-stone-200 p-6 relative overflow-hidden">
+                {/* Decorative gradient overlay */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-900"></div>
+                
                 {/* Loading Overlay */}
                 {loadingBookings && (
-                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                            <p className="text-gray-600 font-medium">Loading bookings...</p>
+                    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-amber-700 absolute top-0 left-0"></div>
+                            </div>
+                            <p className="text-gray-900 font-semibold text-lg">Loading bookings...</p>
                         </div>
                     </div>
                 )}
@@ -458,13 +472,13 @@ export default function DashboardPage() {
                                     <p className="text-gray-800"><strong className="text-gray-900">Guest:</strong> {selectedBooking.extendedProps.guestName}</p>
                                 )}
                                 {selectedBooking.extendedProps.status === 'occupied' && selectedBooking.extendedProps.bookingId && (
-                                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                                        <p className="text-sm text-blue-700">
+                                    <div className="mt-4 p-3 bg-amber-50 rounded-lg">
+                                        <p className="text-sm text-amber-700">
                                             <strong>Booking ID:</strong> {selectedBooking.extendedProps.bookingId}
                                         </p>
                                         <div className="mt-2 flex gap-2">
                                             <button
-                                                className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                                                className="px-3 py-1 bg-amber-700 text-white text-sm rounded hover:bg-amber-800"
                                                 onClick={() => {
                                                     setModalOpen(false);
                                                     window.location.href = '/bookings';

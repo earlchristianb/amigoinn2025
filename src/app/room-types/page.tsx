@@ -95,21 +95,21 @@ export default function RoomTypesPage() {
 
   return (
     <AdminAuthGuard>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="room-types" />
       
       <main className="p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">🏷️ Room Types Management</h2>
-          <p className="text-gray-600 mt-1">Manage room categories and pricing</p>
+        <div className="mb-8">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">🏷️ Room Types Management</h2>
+          <p className="text-gray-700 text-lg">Manage room categories and pricing 🏨</p>
         </div>
 
         <button
-          className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="mb-6 px-6 py-3 bg-gradient-to-r from-amber-700 to-amber-900 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
           onClick={openAddModal}
         >
-          Add Room Type
+          ➕ Add Room Type
         </button>
 
       <table className="w-full border-collapse border border-black">
@@ -191,7 +191,7 @@ export default function RoomTypesPage() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800"
                 onClick={handleSave}
               >
                 Save
