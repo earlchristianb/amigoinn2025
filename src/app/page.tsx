@@ -23,6 +23,7 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingEvent | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date()); // Track current month view
+  const [activeTab, setActiveTab] = useState<'availability' | 'packages' | 'tours'>('availability');
   
   // ALL useEffect hooks must also be at the top level before any conditional returns
   
@@ -223,28 +224,30 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <header className="bg-white/80 backdrop-blur-md shadow-lg border-b border-stone-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-        <Image
+              <Image
                 src="/amigo-logo.jpg"
                 alt="Amigo Inn Siargao"
-                width={60}
-                height={60}
-                className="rounded-full shadow-md"
-          priority
-        />
+                width={70}
+                height={70}
+                className="rounded-full shadow-xl ring-4 ring-amber-100"
+                priority
+              />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Amigo Inn</h1>
-                <p className="text-gray-600 mt-1">Check our room availability</p>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent">
+                  Amigo Inn Siargao
+                </h1>
+                <p className="text-gray-600 text-sm mt-1">Your Paradise Awaits 🏝️</p>
               </div>
             </div>
             <a
               href="/login"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-gradient-to-r from-amber-700 to-amber-900 text-white px-6 py-2.5 rounded-full hover:shadow-lg hover:scale-105 transition-all duration-300 font-medium"
             >
               Admin Login
             </a>
@@ -254,75 +257,127 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tabs */}
+        <div className="mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-stone-200">
+            <nav className="flex space-x-2" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('availability')}
+                className={`${
+                  activeTab === 'availability'
+                    ? 'bg-gradient-to-r from-amber-700 to-amber-900 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-stone-100'
+                } flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105`}
+              >
+                🏨 Room Availability
+              </button>
+              <button
+                onClick={() => setActiveTab('packages')}
+                className={`${
+                  activeTab === 'packages'
+                    ? 'bg-gradient-to-r from-amber-700 to-amber-900 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-stone-100'
+                } flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105`}
+              >
+                📦 Packages
+              </button>
+              <button
+                onClick={() => setActiveTab('tours')}
+                className={`${
+                  activeTab === 'tours'
+                    ? 'bg-gradient-to-r from-amber-700 to-amber-900 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-stone-100'
+                } flex-1 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105`}
+              >
+                🌴 Tours
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'availability' && (
+          <>
         {/* Room Filter */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Filter by Room:
-          </label>
-          <select
-            className="border border-gray-300 rounded-lg px-3 py-2 bg-white"
-            value={selectedRoom || ""}
-            onChange={(e) => setSelectedRoom(e.target.value || null)}
-          >
-            <option value="">All Rooms</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.room_number}>
-                Room {room.room_number} - {room.type} (₱{room.base_price})
-              </option>
-            ))}
-          </select>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-stone-200">
+            <label className="block text-sm font-semibold text-gray-800 mb-3">
+              🔍 Filter by Room
+            </label>
+            <select
+              className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+              value={selectedRoom || ""}
+              onChange={(e) => setSelectedRoom(e.target.value || null)}
+            >
+              <option value="">All Rooms</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.room_number}>
+                  Room {room.room_number} - {room.type} (₱{room.base_price})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Legend */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3 text-gray-800">Room Status Legend</h3>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-green-500 rounded text-white text-xs flex items-center justify-center font-bold">101</div>
-              <span className="text-sm text-gray-700">Available</span>
+          <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-2xl shadow-lg p-6 border border-stone-200">
+            <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center gap-2">
+              <span className="text-2xl">📊</span> Room Status Legend
+            </h3>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg text-white text-xs flex items-center justify-center font-bold shadow-md">101</div>
+                <span className="text-sm font-semibold text-gray-800">Available</span>
+              </div>
+              <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                <div className="w-8 h-8 bg-gradient-to-br from-red-400 to-red-600 rounded-lg text-white text-xs flex items-center justify-center font-bold shadow-md">102</div>
+                <span className="text-sm font-semibold text-gray-800">Occupied</span>
+              </div>
+              <div className="flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-sm border border-stone-100">
+                <div className="w-8 h-8 bg-gradient-to-br from-gray-300 to-gray-400 rounded-lg text-gray-700 text-xs flex items-center justify-center font-bold shadow-md">103</div>
+                <span className="text-sm font-semibold text-gray-800">Unavailable</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-red-500 rounded text-white text-xs flex items-center justify-center font-bold">102</div>
-              <span className="text-sm text-gray-700">Occupied</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gray-300 rounded text-gray-600 text-xs flex items-center justify-center font-bold">103</div>
-              <span className="text-sm text-gray-700">Unavailable</span>
-            </div>
+            <p className="text-sm text-gray-700 mt-4 bg-white/50 rounded-lg px-4 py-2 border border-stone-100">
+              💡 Each date shows all room numbers (100-208) with their current status
+            </p>
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Each date shows all room numbers (100-208) with their current status
-          </p>
         </div>
 
         {/* Error Display */}
         {availabilityError && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Unable to load room availability</h3>
-                <div className="mt-2 text-sm text-red-700">{availabilityError}</div>
-                <div className="mt-4">
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
-                  >
-                    Try Again
-                  </button>
-                </div>
+          <div className="mb-6 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">⚠️</span>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-red-800 mb-2">Unable to load room availability</h3>
+                <div className="text-sm text-red-700 bg-white/50 rounded-lg px-4 py-2 mb-4">{availabilityError}</div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                >
+                  Try Again
+                </button>
               </div>
             </div>
           </div>
         )}
 
                  {/* Calendar */}
-                <div className="bg-white rounded-lg shadow-sm border p-6 relative">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-stone-200 p-6 relative overflow-hidden">
+                  {/* Decorative gradient overlay */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-900"></div>
+                  
                   {/* Loading Overlay */}
                   {loadingBookings && (
-                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <p className="text-gray-600 font-medium">Loading availability...</p>
+                    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="relative">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200"></div>
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-amber-700 absolute top-0 left-0"></div>
+                        </div>
+                        <p className="text-gray-900 font-semibold text-lg">Loading availability...</p>
                       </div>
                     </div>
                   )}
@@ -491,7 +546,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-      </main>
 
       {/* Booking Details Modal */}
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} className="relative z-50">
@@ -558,6 +612,208 @@ export default function Home() {
           </Dialog.Panel>
         </div>
       </Dialog>
+          </>
+        )}
+
+        {/* Packages Tab */}
+        {activeTab === 'packages' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="text-center mb-8">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">
+                Our Exclusive Packages
+              </h2>
+              <p className="text-gray-700 text-lg">Choose the perfect package for your island adventure 🏝️</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* 3D2N Package */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border-2 border-stone-200 hover:shadow-2xl hover:scale-105 transition-all duration-300">
+                <div className="relative">
+                  <div className="absolute top-4 right-4 bg-gradient-to-r from-amber-700 to-amber-900 text-white px-4 py-2 rounded-full font-bold shadow-lg z-10">
+                    3D/2N
+                  </div>
+                  <div className="w-full bg-gradient-to-br from-amber-50 to-stone-50 flex items-center justify-center p-6">
+                    <Image
+                      src="/3d2npackage.jpg"
+                      alt="3 Days 2 Nights Package"
+                      width={600}
+                      height={800}
+                      className="w-full h-auto object-contain rounded-xl shadow-lg"
+                    />
+                  </div>
+                </div>
+                <div className="p-6 bg-gradient-to-br from-white to-amber-50">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">3 Days 2 Nights Package</h3>
+                  <p className="text-gray-700 mb-4">Experience the best of Siargao with our 3-day adventure package</p>
+                  <div className="flex items-center gap-2 text-amber-700 font-semibold">
+                    <span className="text-xl">✨</span>
+                    <span>Perfect for weekend getaways</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4D3N Package */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border-2 border-stone-200 hover:shadow-2xl hover:scale-105 transition-all duration-300">
+                <div className="relative">
+                  <div className="absolute top-4 right-4 bg-gradient-to-r from-amber-800 to-stone-800 text-white px-4 py-2 rounded-full font-bold shadow-lg z-10">
+                    4D/3N
+                  </div>
+                  <div className="w-full bg-gradient-to-br from-stone-50 to-amber-50 flex items-center justify-center p-6">
+                    <Image
+                      src="/4d3npackage.jpg"
+                      alt="4 Days 3 Nights Package"
+                      width={600}
+                      height={800}
+                      className="w-full h-auto object-contain rounded-xl shadow-lg"
+                    />
+                  </div>
+                </div>
+                <div className="p-6 bg-gradient-to-br from-white to-stone-50">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">4 Days 3 Nights Package</h3>
+                  <p className="text-gray-700 mb-4">Extended adventure with more time to explore Siargao's wonders</p>
+                  <div className="flex items-center gap-2 text-amber-800 font-semibold">
+                    <span className="text-xl">🌟</span>
+                    <span>Most popular choice</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tours Tab */}
+        {activeTab === 'tours' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="text-center mb-8">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">
+                Island Tours & Adventures
+              </h2>
+              <p className="text-gray-700 text-lg">Discover the beauty of Siargao with our guided tours 🌴</p>
+            </div>
+
+            {/* 3 Island Tours */}
+            <div className="bg-gradient-to-br from-white to-amber-50 rounded-2xl shadow-xl p-8 border-2 border-stone-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="bg-gradient-to-br from-amber-600 to-amber-800 rounded-2xl p-4 shadow-lg">
+                  <span className="text-4xl">🏝️</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-3xl font-bold text-gray-900 mb-3">3 Island Tours + Secret Beach</h3>
+                  <div className="bg-gradient-to-r from-amber-700 to-amber-900 text-white px-6 py-3 rounded-xl inline-block mb-4 shadow-lg">
+                    <p className="text-2xl font-bold">₱1,500 <span className="text-sm font-normal">per head/joiners</span></p>
+                  </div>
+                  <div className="space-y-3 text-gray-800">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-stone-100">
+                      <p className="flex items-start gap-3">
+                        <span className="text-amber-600 text-xl">🎯</span>
+                        <span><strong className="text-amber-700">Destinations:</strong> Daku, Guyam, Naked + Secret Beach and Coral Garden</span>
+                      </p>
+                    </div>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-600 text-lg">✓</span>
+                      <span>Boat with Licensed Tour Guide</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-600 text-lg">✓</span>
+                      <span>Docking fees</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-600 text-lg">✓</span>
+                      <span>All entrance fees, environmental fees, permits</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-600 text-lg">✓</span>
+                      <span>Boodle Lunch Set up</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sohoton Cove */}
+            <div className="bg-gradient-to-br from-white to-stone-50 rounded-2xl shadow-xl p-8 border-2 border-stone-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="bg-gradient-to-br from-stone-600 to-stone-800 rounded-2xl p-4 shadow-lg">
+                  <span className="text-4xl">🌊</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-3xl font-bold text-gray-900 mb-3">Sohoton Cove Bucas Grande Adventure</h3>
+                  <div className="bg-gradient-to-r from-stone-700 to-stone-900 text-white px-6 py-3 rounded-xl inline-block mb-4 shadow-lg">
+                    <p className="text-2xl font-bold">₱2,800 <span className="text-sm font-normal">per head/joiners</span></p>
+                  </div>
+                  <div className="space-y-3 text-gray-800">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-stone-100">
+                      <p className="flex items-start gap-3">
+                        <span className="text-stone-600 text-xl">🎯</span>
+                        <span><strong className="text-stone-700">Destinations:</strong> Sohoton Cove, Bucas Grande, Haguekan Cove, Magcucuob Cove, Jellyfish Sanctuary, Cliff Diving, Viewing Lagoon, Tiktikan Lagoon and Bolitas Cave</span>
+                      </p>
+                    </div>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-stone-600 text-lg">✓</span>
+                      <span>Tour Guide</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-stone-600 text-lg">✓</span>
+                      <span>Permits and Environmental Fees</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-stone-600 text-lg">✓</span>
+                      <span>Entrances</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-stone-600 text-lg">✓</span>
+                      <span>Lunch</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* South Land Tour */}
+            <div className="bg-gradient-to-br from-white to-amber-50 rounded-2xl shadow-xl p-8 border-2 border-stone-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="bg-gradient-to-br from-amber-800 to-stone-900 rounded-2xl p-4 shadow-lg">
+                  <span className="text-4xl">🚐</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-3xl font-bold text-gray-900 mb-3">South Land Tour</h3>
+                  <div className="bg-gradient-to-r from-amber-800 to-stone-900 text-white px-6 py-3 rounded-xl inline-block mb-4 shadow-lg">
+                    <p className="text-2xl font-bold">₱1,900 <span className="text-sm font-normal">per head</span></p>
+                  </div>
+                  <div className="space-y-3 text-gray-800">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-stone-100">
+                      <p className="flex items-start gap-3">
+                        <span className="text-amber-700 text-xl">🎯</span>
+                        <span><strong className="text-amber-800">Destinations:</strong> Maasin River, Magpupungko Rock Formation, Coconut Road, Coconut View, Sugba Lagoon</span>
+                      </p>
+                    </div>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-700 text-lg">✓</span>
+                      <span>Tour Guide</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-700 text-lg">✓</span>
+                      <span>Van Transfers</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-700 text-lg">✓</span>
+                      <span>Permits and Environmental Fees</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-700 text-lg">✓</span>
+                      <span>Entrances</span>
+                    </p>
+                    <p className="flex items-start gap-3 pl-2">
+                      <span className="text-amber-700 text-lg">✓</span>
+                      <span>Lunch</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

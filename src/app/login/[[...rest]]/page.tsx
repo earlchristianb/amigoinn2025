@@ -77,7 +77,7 @@ export default function LoginPage() {
           <SignIn 
             appearance={{
               elements: {
-                formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-sm normal-case',
+                formButtonPrimary: 'bg-amber-700 hover:bg-amber-800 text-sm normal-case',
                 card: 'shadow-xl',
                 rootBox: 'w-full flex justify-center',
                 cardBox: 'w-full max-w-md',

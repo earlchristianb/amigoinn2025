@@ -141,38 +141,45 @@ export default function GuestsPage() {
 
   return (
     <AdminAuthGuard>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="guests" />
       
       <main className="p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">👥 Guests Management</h2>
-          <p className="text-gray-600 mt-1">Manage guest information and bookings</p>
+        <div className="mb-8">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">👥 Guests Management</h2>
+          <p className="text-gray-700 text-lg">Manage guest information and bookings 🏨</p>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center items-center py-8">
-            <div className="text-lg text-gray-600">Loading guests...</div>
+          <div className="flex justify-center items-center py-12">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-stone-200">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-amber-700 absolute top-0 left-0"></div>
+                </div>
+                <p className="text-gray-900 font-semibold text-lg">Loading guests...</p>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading guests</h3>
-                <div className="mt-2 text-sm text-red-700">{error}</div>
-                <div className="mt-4">
-                  <button
-                    onClick={fetchGuests}
-                    className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
-                  >
-                    Try Again
-                  </button>
-                </div>
+          <div className="mb-6 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">⚠️</span>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-red-800 mb-2">Error loading guests</h3>
+                <div className="text-sm text-red-700 bg-white/50 rounded-lg px-4 py-2 mb-4">{error}</div>
+                <button
+                  onClick={fetchGuests}
+                  className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                >
+                  Try Again
+                </button>
               </div>
             </div>
           </div>
@@ -183,7 +190,7 @@ export default function GuestsPage() {
           <>
             <div className="mb-4 flex justify-between items-center">
         <button
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800"
           onClick={openAddModal}
         >
           Add Guest
@@ -281,7 +288,7 @@ export default function GuestsPage() {
                   onClick={() => setCurrentPage(pageNum)}
                   className={`px-3 py-1 border border-gray-300 rounded ${
                     currentPage === pageNum
-                      ? 'bg-blue-500 text-white'
+                      ? 'bg-amber-700 text-white'
                       : 'bg-white text-black hover:bg-gray-50'
                   }`}
                 >
@@ -362,7 +369,7 @@ export default function GuestsPage() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800"
                 type="submit"
               >
                 Save

@@ -6,6 +6,31 @@ import AdminNavigation from "@/components/AdminNavigation";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 import Papa from "papaparse";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 export default function ReportsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -20,6 +45,129 @@ export default function ReportsPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  };
+
+  // Calculate monthly earnings for the current year
+  const calculateMonthlyEarnings = () => {
+    const currentYear = new Date().getFullYear();
+    const monthlyEarnings = Array.from({ length: 12 }, (_, index) => {
+      const month = index; // 0-11 for Jan-Dec
+      const monthStart = new Date(currentYear, month, 1);
+      const monthEnd = new Date(currentYear, month + 1, 0);
+      
+      const monthBookings = bookings.filter(booking => {
+        const bookingDate = new Date(booking.created_at);
+        return bookingDate >= monthStart && bookingDate <= monthEnd;
+      });
+      
+      const totalEarnings = monthBookings.reduce((sum, booking) => {
+        const totalPaid = booking.payments?.reduce((paymentSum, payment) => 
+          paymentSum + Number(payment.amount), 0) || 0;
+        return sum + totalPaid;
+      }, 0);
+      
+      return {
+        month: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+        earnings: totalEarnings
+      };
+    });
+    
+    return monthlyEarnings;
+  };
+
+  const monthlyEarnings = calculateMonthlyEarnings();
+
+  // Chart data configuration
+  const chartData = {
+    labels: monthlyEarnings.map(item => item.month),
+    datasets: [
+      {
+        label: 'Monthly Earnings (₱)',
+        data: monthlyEarnings.map(item => item.earnings),
+        borderColor: 'rgb(180, 83, 9)', // amber-700
+        backgroundColor: 'rgba(180, 83, 9, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: 'rgb(180, 83, 9)',
+        pointBorderColor: 'rgb(255, 255, 255)',
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: 'rgb(180, 83, 9)',
+        pointHoverBorderColor: 'rgb(255, 255, 255)',
+        pointHoverBorderWidth: 3,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 14,
+            weight: 'bold' as const,
+          },
+          color: 'rgb(55, 65, 81)', // gray-700
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: 'rgb(180, 83, 9)',
+        borderWidth: 1,
+        cornerRadius: 8,
+        displayColors: false,
+        callbacks: {
+          label: function(context: any) {
+            return `Earnings: ₱${formatCurrency(context.parsed.y)}`;
+          }
+        }
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: 'rgb(107, 114, 128)', // gray-500
+          font: {
+            size: 12,
+            weight: 'normal' as const,
+          },
+        },
+      },
+      y: {
+        grid: {
+          color: 'rgba(156, 163, 175, 0.2)', // gray-400 with opacity
+          drawBorder: false,
+        },
+        ticks: {
+          color: 'rgb(107, 114, 128)', // gray-500
+          font: {
+            size: 12,
+            weight: 'normal' as const,
+          },
+          callback: function(value: any) {
+            return '₱' + formatCurrency(value);
+          },
+        },
+      },
+    },
+    elements: {
+      point: {
+        hoverBackgroundColor: 'rgb(180, 83, 9)',
+      },
+    },
   };
 
   // Pagination states
@@ -259,19 +407,19 @@ export default function ReportsPage() {
 
   return (
     <AdminAuthGuard>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
       <Toaster position="top-right" />
       <AdminNavigation currentPage="reports" />
 
       <main className="p-6">
         {/* Page Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">📊 Reports & Analytics</h2>
-          <p className="text-gray-600 mt-1">Generate and export booking reports</p>
+        <div className="mb-8">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">📊 Reports & Analytics</h2>
+          <p className="text-gray-700 text-lg">Generate and export booking reports 🏨</p>
         </div>
 
         {/* Filter Section */}
-        <div className="mb-6 bg-white p-4 rounded-lg shadow border border-gray-200">
+        <div className="mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-stone-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -320,11 +468,72 @@ export default function ReportsPage() {
           </div>
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Paid</h3>
-            <p className="text-3xl font-bold text-blue-600">₱{formatCurrency(summary.totalPaid)}</p>
+            <p className="text-3xl font-bold text-amber-700">₱{formatCurrency(summary.totalPaid)}</p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-600 mb-2">Pending Payments</h3>
             <p className="text-3xl font-bold text-red-600">₱{formatCurrency(summary.totalPending)}</p>
+          </div>
+        </div>
+
+        {/* Monthly Earnings Chart */}
+        <div className="mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-stone-200 p-6">
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <span className="text-3xl">📈</span> Monthly Earnings Overview
+              </h3>
+              <p className="text-gray-600">
+                Track your monthly earnings throughout {new Date().getFullYear()} to identify trends and peak seasons
+              </p>
+            </div>
+            
+            <div className="relative h-96">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+            
+            {/* Chart Statistics */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">📊</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Best Month</p>
+                    <p className="text-lg font-bold text-amber-700">
+                      {monthlyEarnings.reduce((max, current) => 
+                        current.earnings > max.earnings ? current : max, monthlyEarnings[0]
+                      )?.month || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">💰</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Highest Earnings</p>
+                    <p className="text-lg font-bold text-amber-700">
+                      ₱{formatCurrency(Math.max(...monthlyEarnings.map(m => m.earnings)))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">📅</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Average Monthly</p>
+                    <p className="text-lg font-bold text-amber-700">
+                      ₱{formatCurrency(
+                        monthlyEarnings.reduce((sum, month) => sum + month.earnings, 0) / 12
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -353,7 +562,7 @@ export default function ReportsPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleExportCSV}
-              className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 font-medium"
+              className="px-6 py-3 bg-amber-700 text-white rounded hover:bg-amber-800 font-medium"
               disabled={filteredBookings.length === 0}
             >
               📥 Export Detailed Report (CSV)
@@ -473,7 +682,7 @@ export default function ReportsPage() {
                       onClick={() => setCurrentPage(pageNum)}
                       className={`px-3 py-1 border border-gray-300 rounded ${
                         currentPage === pageNum
-                          ? 'bg-blue-500 text-white'
+                          ? 'bg-amber-700 text-white'
                           : 'bg-white text-black hover:bg-gray-50'
                       }`}
                     >
