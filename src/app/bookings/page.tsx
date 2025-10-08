@@ -27,6 +27,8 @@ export default function BookingsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [monthFilterType, setMonthFilterType] = useState<string>("created_at"); // Default to "created_at"
   const [selectedGuest, setSelectedGuest] = useState<string>("");
+  const [guestSearchTerm, setGuestSearchTerm] = useState<string>("");
+  const [showGuestDropdown, setShowGuestDropdown] = useState<boolean>(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   
   // Payment edit state
@@ -47,6 +49,21 @@ export default function BookingsPage() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+
+  // Close guest dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.guest-search-container')) {
+        setShowGuestDropdown(false);
+      }
+    };
+
+    if (showGuestDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showGuestDropdown]);
 
   // Helper functions for managing multiple rooms
   const addRoom = () => {
@@ -123,6 +140,29 @@ export default function BookingsPage() {
   };
 
   // Filter bookings based on selected filters
+  // Filter guests based on search term
+  const filteredGuestOptions = guests.filter(guest =>
+    guest.name.toLowerCase().includes(guestSearchTerm.toLowerCase()) ||
+    guest.email?.toLowerCase().includes(guestSearchTerm.toLowerCase()) ||
+    guest.phone?.includes(guestSearchTerm)
+  );
+
+  // Handle guest selection
+  const handleGuestSelect = (guestId: string, guestName: string) => {
+    setSelectedGuest(guestId);
+    setGuestSearchTerm(guestName);
+    setShowGuestDropdown(false);
+  };
+
+  // Handle guest search input
+  const handleGuestSearchChange = (value: string) => {
+    setGuestSearchTerm(value);
+    setShowGuestDropdown(true);
+    if (value === "") {
+      setSelectedGuest("");
+    }
+  };
+
   const applyFilters = () => {
     let filtered = [...bookings];
 
@@ -651,22 +691,60 @@ export default function BookingsPage() {
               <option value="checkin_checkout">Check-in/Check-out</option>
             </select>
           </div>
-          <div>
+          <div className="relative guest-search-container">
             <label className="block text-sm font-semibold text-gray-800 mb-3">
               👤 Filter by Guest
             </label>
-            <select
-              value={selectedGuest}
-              onChange={(e) => setSelectedGuest(e.target.value)}
-              className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
-            >
-              <option value="">All Guests</option>
-              {guests.map((guest) => (
-                <option key={guest.id} value={guest.id}>
-                  {guest.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={guestSearchTerm}
+                onChange={(e) => handleGuestSearchChange(e.target.value)}
+                onFocus={() => setShowGuestDropdown(true)}
+                placeholder="Search by name, email, or phone..."
+                className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+              />
+              {guestSearchTerm && (
+                <button
+                  onClick={() => {
+                    setGuestSearchTerm("");
+                    setSelectedGuest("");
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            {/* Dropdown Results */}
+            {showGuestDropdown && guestSearchTerm && filteredGuestOptions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border-2 border-stone-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                {filteredGuestOptions.map((guest) => (
+                  <button
+                    key={guest.id}
+                    onClick={() => handleGuestSelect(guest.id, guest.name)}
+                    className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-stone-100 last:border-b-0"
+                  >
+                    <div className="font-semibold text-gray-900">{guest.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {guest.email && <span>{guest.email}</span>}
+                      {guest.email && guest.phone && <span> • </span>}
+                      {guest.phone && <span>{guest.phone}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* No results message */}
+            {showGuestDropdown && guestSearchTerm && filteredGuestOptions.length === 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border-2 border-stone-200 rounded-xl shadow-xl p-4">
+                <p className="text-gray-600 text-sm">No guests found matching "{guestSearchTerm}"</p>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-3">
@@ -688,6 +766,7 @@ export default function BookingsPage() {
               onClick={() => {
                 setSelectedMonth("");
                 setSelectedGuest("");
+                setGuestSearchTerm("");
                 setSelectedStatus("");
               }}
               className="w-full px-4 py-3 bg-gradient-to-r from-stone-500 to-stone-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
