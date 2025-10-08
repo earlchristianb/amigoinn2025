@@ -245,12 +245,6 @@ export default function Home() {
                 <p className="text-gray-600 text-sm mt-1">Your Paradise Awaits 🏝️</p>
               </div>
             </div>
-            <a
-              href="/login"
-              className="bg-gradient-to-r from-amber-700 to-amber-900 text-white px-6 py-2.5 rounded-full hover:shadow-lg hover:scale-105 transition-all duration-300 font-medium"
-            >
-              Admin Login
-            </a>
           </div>
         </div>
       </header>
@@ -813,6 +807,141 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Testimonials / Reviews Section */}
+        <div className="mt-12 mb-8">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">
+              Guest Reviews & Testimonials
+            </h2>
+            <p className="text-gray-700 text-lg">See what our guests are saying about their experience at Amigo Inn ⭐</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Facebook Review Embed */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border-2 border-stone-200 p-6 hover:shadow-2xl transition-all duration-300">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-full p-3 shadow-lg">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Facebook Review</h3>
+                  <p className="text-sm text-gray-600">From our Facebook page</p>
+                </div>
+              </div>
+              
+              <div className="relative bg-gradient-to-br from-blue-50 to-stone-50 rounded-xl p-4">
+                <iframe 
+                  src="https://www.facebook.com/plugins/post.php?href=https%3A%2F%2Fwww.facebook.com%2Famigoinnsiargao%2Fposts%2Fpfbid07b7dqND9spxAvMNToVMzf3Z85NRddBdfgxSKopnVkqGHXB9w711DutgHEoejKHq3l&show_text=true&width=500" 
+                  width="100%" 
+                  height="449" 
+                  style={{border: 'none', overflow: 'hidden'}}
+                  scrolling="no" 
+                  frameBorder="0" 
+                  allowFullScreen={true}
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  className="rounded-lg"
+                ></iframe>
+              </div>
+            </div>
+
+            {/* Additional Info / Call to Action */}
+            <div className="space-y-6">
+              {/* Trust Badges */}
+              <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-2xl shadow-xl p-8 border-2 border-stone-200">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Why Choose Amigo Inn?</h3>
+                
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-900 mb-1">Prime Location</h4>
+                      <p className="text-gray-700">Perfect location in Siargao with easy access to beaches and attractions</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-900 mb-1">Comfortable Rooms</h4>
+                      <p className="text-gray-700">Clean, spacious rooms with modern amenities for your comfort</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-900 mb-1">Friendly Service</h4>
+                      <p className="text-gray-700">Warm hospitality and helpful staff ready to assist you</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-900 mb-1">Great Value</h4>
+                      <p className="text-gray-700">Affordable rates with excellent quality and service</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Social Media Links */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border-2 border-stone-200">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Connect With Us</h3>
+                <div className="space-y-3">
+                  <a 
+                    href="https://www.facebook.com/amigoinnsiargao" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:shadow-md hover:scale-105 transition-all duration-300"
+                  >
+                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-gray-900">Follow us on Facebook</p>
+                      <p className="text-sm text-gray-600">@amigoinnsiargao</p>
+                    </div>
+                  </a>
+
+                  <a 
+                    href="https://www.instagram.com/amigoinnsiargao/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-gradient-to-r from-pink-50 to-purple-100 rounded-xl hover:shadow-md hover:scale-105 transition-all duration-300"
+                  >
+                    <svg className="w-6 h-6 text-pink-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                    <div>
+                      <p className="font-semibold text-gray-900">Follow us on Instagram</p>
+                      <p className="text-sm text-gray-600">@amigoinnsiargao</p>
+                    </div>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

@@ -152,10 +152,6 @@ export default function RoomsPage() {
             </select>
             <span className="text-gray-700">entries</span>
           </div>
-          
-          <div className="text-gray-700">
-            Showing {startIndex + 1} to {Math.min(endIndex, totalRooms)} of {totalRooms} entries
-          </div>
         </div>
       </div>
 
