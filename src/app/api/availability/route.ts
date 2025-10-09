@@ -47,10 +47,11 @@ export async function GET(req: Request) {
     
     // Get all rooms with their types and booking rooms
     const rooms = await prisma.room.findMany({
+      where: { deletedAt: null },
       include: {
         roomType: true,
         bookingRooms: {
-          where: dateFilter,
+          where: { ...dateFilter, deletedAt: null },
           select: {
             checkInDate: true,
             checkOutDate: true,

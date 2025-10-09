@@ -9,14 +9,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Check if email exists in admin_emails table
-    const adminCheck = await prisma.adminEmail.findFirst({
-      where: { email },
+    // Check if email exists in profiles table
+    const profile = await prisma.profile.findFirst({
+      where: { 
+        email,
+      },
     });
 
-    return NextResponse.json({ 
-      isAdmin: !!adminCheck,
-      email 
+    return NextResponse.json({
+      isAdmin: !!profile,
+      email,
+      role: (profile as any)?.role || null,
+      name: profile?.name || null
     });
   } catch (error) {
     console.error('Error checking admin status:', error);

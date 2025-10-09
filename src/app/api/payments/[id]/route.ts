@@ -37,8 +37,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
 
   try {
-    await prisma.payment.delete({
+    // Soft delete - update deletedAt instead of actual delete
+    await prisma.payment.update({
       where: { id: BigInt(id) },
+      data: { deletedAt: new Date() },
     });
 
     return NextResponse.json({ success: true });

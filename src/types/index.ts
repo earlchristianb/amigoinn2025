@@ -126,6 +126,7 @@ export interface BookingRoom {
 export interface BookingExtra {
   id: string;
   booking_id: string;
+  extra_id?: string | null;
   label: string;
   price: number;
   quantity: number;
@@ -138,6 +139,9 @@ export interface Booking {
   guest_id: string;
   total_price: number;
   discount: number;
+  status: 'pending' | 'checked_in' | 'checked_out' | 'cancelled';
+  proof_image_url?: string | null;
+  note?: string | null;
   created_at: string;
   updated_at: string;
   guest: Guest;
@@ -196,9 +200,12 @@ export interface CreateBookingRoomRequest {
 }
 
 export interface CreateBookingExtraRequest {
+  extraId?: string;
   label: string;
   price: number;
   quantity?: number;
+  isPackage?: boolean;
+  includedNights?: number | null;
 }
 
 export interface CreateBookingRequest {
@@ -207,6 +214,7 @@ export interface CreateBookingRequest {
   booking_extras?: CreateBookingExtraRequest[];
   total_price: number;
   discount?: number;
+  note?: string;
 }
 
 export interface CreateGuestRequest {

@@ -176,10 +176,16 @@ export default function RoomTypesPage() {
             <div className="mb-4">
               <label className="block font-semibold mb-1 text-gray-800">Base Price (₱)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 className="border border-gray-300 rounded w-full p-2 bg-white text-gray-800"
                 value={basePrice ?? ""}
-                onChange={(e) => setBasePrice(Number(e.target.value))}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setBasePrice(value === '' ? null : Number(value));
+                }}
+                placeholder="0"
               />
             </div>
 

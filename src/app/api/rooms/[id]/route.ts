@@ -15,14 +15,32 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     include: { roomType: true },
   });
 
-  return NextResponse.json(room);
+  // Serialize BigInt to string
+  const serializedRoom = {
+    id: room.id.toString(),
+    room_number: room.roomNumber,
+    room_type_id: room.roomTypeId.toString(),
+    is_available: room.isAvailable,
+    type: room.roomType ? {
+      id: room.roomType.id.toString(),
+      name: room.roomType.name,
+      description: room.roomType.description,
+      base_price: Number(room.roomType.basePrice)
+    } : null,
+    created_at: room.createdAt.toISOString(),
+    updated_at: room.updatedAt.toISOString(),
+  };
+
+  return NextResponse.json(serializedRoom);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  await prisma.room.delete({
+  // Soft delete - update deletedAt instead of actual delete
+  await prisma.room.update({
     where: { id: BigInt(id) },
+    data: { deletedAt: new Date() },
   });
 
   return NextResponse.json({ success: true });

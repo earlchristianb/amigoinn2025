@@ -1,5 +1,5 @@
 // ======================================================
-// 🔹 DataSource & Generator
+// 🔹 Datasource & Generator
 // ======================================================
 datasource db {
   provider = "postgresql"
@@ -11,143 +11,216 @@ generator client {
 }
 
 // ======================================================
-// 🔹 Admin Emails
+// 🔹 Enums
 // ======================================================
-model AdminEmail {
-  email String @id
+enum ProfileRole {
+  admin
+  assistant
 
-  @@map("admin_emails")
+  @@map("profile_role")
+}
+
+enum BookingStatus {
+  pending
+  checked_in
+  checked_out
+  cancelled
+
+  @@map("booking_status")
+}
+
+enum PaymentStatus {
+  unpaid
+  partial
+  paid
+
+  @@map("payment_status")
 }
 
 // ======================================================
 // 🔹 Profiles
 // ======================================================
 model Profile {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @map("updated_at")
+  id         BigInt       @id @default(autoincrement())
+  name       String
+  email      String       @unique
+  role       ProfileRole  @default(assistant)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @default(now()) @map("updated_at")
+  deletedAt  DateTime?    @map("deleted_at")
 
   @@map("profiles")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
 // 🔹 Guests
 // ======================================================
 model Guest {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  email     String?
-  phone     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @map("updated_at")
+  id         BigInt    @id @default(autoincrement())
+  name       String
+  email      String?
+  phone      String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
 
-  bookings  Booking[]
+  bookings   Booking[]
 
   @@map("guests")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
 // 🔹 Room Types
 // ======================================================
 model RoomType {
-  id          BigInt   @id @default(autoincrement())
+  id          BigInt    @id @default(autoincrement())
   name        String
   description String?
-  basePrice   Decimal  @map("base_price") @db.Decimal(10,2)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @map("updated_at")
+  basePrice   Decimal   @map("base_price")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   rooms       Room[]
 
   @@map("room_types")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
 // 🔹 Rooms
 // ======================================================
 model Room {
-  id          BigInt   @id @default(autoincrement())
-  roomNumber  String   @unique @map("room_number")
-  roomTypeId  BigInt   @map("room_type_id")
-  isAvailable Boolean  @default(true) @map("is_available")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @map("updated_at")
+  id           BigInt    @id @default(autoincrement())
+  roomNumber   String    @unique @map("room_number")
+  roomTypeId   BigInt    @map("room_type_id")
+  isAvailable  Boolean   @default(true) @map("is_available")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
 
-  roomType    RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  roomType     RoomType  @relation(fields: [roomTypeId], references: [id])
   bookingRooms BookingRoom[]
 
   @@map("rooms")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
 // 🔹 Bookings
 // ======================================================
 model Booking {
-  id        BigInt   @id @default(autoincrement())
-  guestId   BigInt   @map("guest_id")
-  totalPrice Decimal @map("total_price") @db.Decimal(10,2)
-  discount   Decimal @default(0) @db.Decimal(10,2)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @default(now()) @map("updated_at")
+  id             BigInt         @id @default(autoincrement())
+  guestId        BigInt         @map("guest_id")
+  totalPrice     Decimal        @map("total_price") @db.Decimal(12, 2)
+  discount       Decimal        @default(0) @db.Decimal(12, 2)
+  status         BookingStatus  @default(pending)
+  proofImageUrl  String?        @map("proof_image_url")
+  note           String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @default(now()) @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
 
-  guest        Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  bookingRooms BookingRoom[]
-  bookingExtras BookingExtra[]
-  payments     Payment[]
+  guest          Guest          @relation(fields: [guestId], references: [id])
+  bookingRooms   BookingRoom[]
+  payments       Payment[]
+  bookingExtras  BookingExtra[]
 
   @@map("bookings")
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@index([status])
 }
 
 // ======================================================
-// 🔹 Booking Rooms (junction table)
+// 🔹 Booking Rooms
 // ======================================================
 model BookingRoom {
-  id          BigInt   @id @default(autoincrement())
-  bookingId   BigInt   @map("booking_id")
-  roomId      BigInt   @map("room_id")
-  checkInDate DateTime @map("check_in_date")
-  checkOutDate DateTime @map("check_out_date")
-  price       Decimal @db.Decimal(10,2)
-  discount    Decimal  @default(0) @db.Decimal(10,2)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @map("updated_at")
+  id            BigInt    @id @default(autoincrement())
+  bookingId     BigInt    @map("booking_id")
+  roomId        BigInt    @map("room_id")
+  checkInDate   DateTime  @map("check_in_date")
+  checkOutDate  DateTime  @map("check_out_date")
+  price         Decimal   @db.Decimal(12, 2)
+  discount      Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  booking       Booking   @relation(fields: [bookingId], references: [id])
+  room          Room      @relation(fields: [roomId], references: [id])
 
   @@map("booking_rooms")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
-// 🔹 Booking Extras (additional payables)
+// 🔹 Extras (fixed priced add-ons/tours)
+// ======================================================
+model Extra {
+  id              BigInt    @id @default(autoincrement())
+  name            String
+  description     String?
+  price           Decimal   @db.Decimal(12, 2)
+  isPackage       Boolean   @default(false) @map("is_package")
+  includedNights  Int?      @map("included_nights")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  bookingExtras BookingExtra[]
+
+  @@map("extras")
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@index([isPackage])
+}
+
+// ======================================================
+// 🔹 Booking Extras
 // ======================================================
 model BookingExtra {
-  id          BigInt   @id @default(autoincrement())
-  bookingId   BigInt   @map("booking_id")
-  label       String   // e.g., "Extra Towel", "Motorcycle Rental", "Island Tour"
-  price       Decimal @db.Decimal(10,2)
-  quantity    Int      @default(1)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @map("updated_at")
+  id         BigInt    @id @default(autoincrement())
+  bookingId  BigInt    @map("booking_id")
+  extraId    BigInt?   @map("extra_id")
+  label      String
+  price      Decimal   @db.Decimal(12, 2)
+  quantity   Int       @default(1)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking    Booking   @relation(fields: [bookingId], references: [id])
+  extra      Extra?    @relation(fields: [extraId], references: [id])
 
   @@map("booking_extras")
+  @@index([deletedAt])
+  @@index([createdAt])
 }
 
 // ======================================================
 // 🔹 Payments
 // ======================================================
 model Payment {
-  id        BigInt   @id @default(autoincrement())
-  bookingId BigInt   @map("booking_id")
-  amount    Decimal @db.Decimal(10,2)
-  method    String   @default("cash")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         BigInt         @id @default(autoincrement())
+  bookingId  BigInt         @map("booking_id")
+  amount     Decimal        @db.Decimal(12, 2)
+  method     String         @default("cash")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  deletedAt  DateTime?      @map("deleted_at")
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking    Booking        @relation(fields: [bookingId], references: [id])
 
   @@map("payments")
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@index([bookingId])
 }
+

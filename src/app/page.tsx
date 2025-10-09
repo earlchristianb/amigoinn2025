@@ -518,27 +518,110 @@ export default function Home() {
                   />
                 </div>
 
-        {/* Room Information */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rooms.map((room) => (
-            <div key={room.id} className="bg-white rounded-lg shadow-sm border border-gray-300 p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-lg text-gray-800">Room {room.room_number}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  room.is_available 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {room.is_available ? 'Available' : 'Occupied'}
-                </span>
+        {/* Room Types */}
+        <div className="mt-8">
+          <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-2xl shadow-lg p-8 border-2 border-stone-200">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 flex items-center gap-2">
+                Room Types Available
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Solo Aircon */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-6 border-2 border-amber-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg">
+                    <span className="text-3xl">🧍</span>
+                  </div>
+                </div>
+                <h4 className="text-xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-2">Solo Aircon</h4>
+                <p className="text-gray-700 text-sm mb-3">Air-conditioned room for solo travelers</p>
+                <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-lg p-3 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-800 mb-2">Room Numbers:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {rooms
+                      .filter(room => room.type.toLowerCase().includes('solo') && room.type.toLowerCase().includes('aircon'))
+                      .map(room => (
+                        <span key={room.id} className="bg-gradient-to-r from-amber-700 to-amber-900 text-white text-xs px-2 py-1 rounded font-medium shadow-sm">
+                          {room.room_number}
+                        </span>
+                      ))
+                    }
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-700 text-sm mb-1 font-medium">{room.type}</p>
-              <p className="text-lg font-semibold text-gray-800">₱{room.base_price}/night</p>
-              <p className="text-xs text-gray-600 mt-2">
-                {room.bookings.length} booking{room.bookings.length !== 1 ? 's' : ''}
-              </p>
+
+              {/* Solo Fan */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-6 border-2 border-amber-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg">
+                    <span className="text-3xl">🧍</span>
+                  </div>
+                </div>
+                <h4 className="text-xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-2">Solo Fan</h4>
+                <p className="text-gray-700 text-sm mb-3">Fan-cooled room for budget-conscious solo travelers</p>
+                <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-lg p-3 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-800 mb-2">Room Numbers:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {rooms
+                      .filter(room => room.type.toLowerCase().includes('solo') && room.type.toLowerCase().includes('fan'))
+                      .map(room => (
+                        <span key={room.id} className="bg-gradient-to-r from-amber-700 to-amber-900 text-white text-xs px-2 py-1 rounded font-medium shadow-sm">
+                          {room.room_number}
+                        </span>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {/* Couple Aircon */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-6 border-2 border-amber-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg">
+                    <span className="text-3xl">👫</span>
+                  </div>
+                </div>
+                <h4 className="text-xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-2">Couple Aircon</h4>
+                <p className="text-gray-700 text-sm mb-3">Air-conditioned room perfect for couples</p>
+                <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-lg p-3 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-800 mb-2">Room Numbers:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {rooms
+                      .filter(room => room.type.toLowerCase().includes('couple'))
+                      .map(room => (
+                        <span key={room.id} className="bg-gradient-to-r from-amber-700 to-amber-900 text-white text-xs px-2 py-1 rounded font-medium shadow-sm">
+                          {room.room_number}
+                        </span>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {/* Family Room */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-6 border-2 border-amber-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="bg-gradient-to-r from-amber-600 to-amber-800 rounded-full p-3 shadow-lg">
+                    <span className="text-3xl">👨‍👩‍👧‍👦</span>
+                  </div>
+                </div>
+                <h4 className="text-xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-2">Family Room</h4>
+                <p className="text-gray-700 text-sm mb-3">Spacious room for families and groups</p>
+                <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-lg p-3 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-800 mb-2">Room Numbers:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {rooms
+                      .filter(room => room.type.toLowerCase().includes('family'))
+                      .map(room => (
+                        <span key={room.id} className="bg-gradient-to-r from-amber-700 to-amber-900 text-white text-xs px-2 py-1 rounded font-medium shadow-sm">
+                          {room.room_number}
+                        </span>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
             </div>
-          ))}
+          </div>
         </div>
 
       {/* Booking Details Modal */}
