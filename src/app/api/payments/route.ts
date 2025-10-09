@@ -46,12 +46,23 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert payment
-  await prisma.payment.create({
+  const payment = await prisma.payment.create({
     data: {
       bookingId: booking.id,
-      amount: paymentAmount,
+      amount: Number(paymentAmount),
+      method: "cash",
     },
   });
 
-  return NextResponse.json({ success: true, paid: paymentAmount });
+  return NextResponse.json({ 
+    success: true, 
+    paid: Number(payment.amount),
+    payment: {
+      id: payment.id.toString(),
+      booking_id: payment.bookingId.toString(),
+      amount: Number(payment.amount),
+      method: payment.method,
+      created_at: payment.createdAt.toISOString(),
+    }
+  });
 }

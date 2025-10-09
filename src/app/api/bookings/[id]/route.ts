@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { guestId, booking_rooms, booking_extras, total_price, discount } = await req.json();
+    const { guestId, booking_rooms, booking_extras, total_price, discount, note } = await req.json();
 
     console.log('PUT /api/bookings/[id] - Received data:', { id, guestId, booking_rooms, total_price, discount });
 
@@ -127,12 +127,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     // Update booking
-    const updatedBooking = await tx.booking.update({
+    await tx.booking.update({
       where: { id: BigInt(id) },
       data: {
-        guestId: BigInt(guestId),
+        guest: {
+          connect: { id: BigInt(guestId) }
+        },
         totalPrice: Number(total_price),
         discount: Number(discount || 0),
+        note: note || null,
       },
     });
 
@@ -155,6 +158,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       await tx.bookingExtra.createMany({
         data: booking_extras.map((extra: any) => ({
           bookingId: BigInt(id),
+          extraId: extra.extraId ? BigInt(extra.extraId) : null,
           label: extra.label,
           price: Number(extra.price),
           quantity: extra.quantity || 1,
@@ -191,6 +195,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     guest_id: booking.guestId.toString(),
     total_price: Number(booking.totalPrice),
     discount: Number(booking.discount || 0),
+    note: (booking as any).note || null,
     created_at: booking.createdAt.toISOString(),
     updated_at: booking.updatedAt.toISOString(),
     guest: {
@@ -227,6 +232,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     booking_extras: booking.bookingExtras?.map((ex: any) => ({
       id: ex.id.toString(),
       booking_id: ex.bookingId.toString(),
+      extra_id: ex.extraId ? ex.extraId.toString() : null,
       label: ex.label,
       price: Number(ex.price),
       quantity: ex.quantity,
@@ -254,6 +260,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await prisma.booking.delete({ where: { id: BigInt(id) } });
+  // Soft delete - update deletedAt instead of actual delete
+  await prisma.booking.update({ 
+    where: { id: BigInt(id) },
+    data: { deletedAt: new Date() }
+  });
   return NextResponse.json({ success: true });
 }

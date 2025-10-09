@@ -8,12 +8,16 @@ const isProtectedRoute = createRouteMatcher([
   '/guests(.*)',
   '/rooms(.*)',
   '/room-types(.*)',
+  '/extras(.*)',
   '/reports(.*)',
+  '/users(.*)',
   '/api/bookings(.*)',
   '/api/guests(.*)',
   '/api/rooms(.*)',
   '/api/room-types(.*)',
+  '/api/extras(.*)',
   '/api/payments(.*)',
+  '/api/users(.*)',
   // Note: /api/availability is NOT protected - it's used by the public homepage
 ]);
 

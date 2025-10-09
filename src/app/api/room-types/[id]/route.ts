@@ -41,8 +41,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const { id } = await params;
 
-    await prisma.roomType.delete({
+    // Soft delete - update deletedAt instead of actual delete
+    await prisma.roomType.update({
       where: { id: BigInt(id) },
+      data: { deletedAt: new Date() },
     });
 
     return NextResponse.json({ success: true });

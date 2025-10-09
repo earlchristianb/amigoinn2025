@@ -12,6 +12,7 @@ export default function BookingsPage() {
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [extras, setExtras] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -20,6 +21,7 @@ export default function BookingsPage() {
   const [bookingExtras, setBookingExtras] = useState<CreateBookingExtraRequest[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [bookingDiscount, setBookingDiscount] = useState<string>("");
+  const [bookingNote, setBookingNote] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   
@@ -41,10 +43,17 @@ export default function BookingsPage() {
   const [partialPaymentAmount, setPartialPaymentAmount] = useState<string>("");
   const [partialPaymentError, setPartialPaymentError] = useState<string>("");
   
+  // Check-in modal state
+  const [checkInModalOpen, setCheckInModalOpen] = useState<boolean>(false);
+  const [checkInBookingId, setCheckInBookingId] = useState<number | null>(null);
+  const [checkInProofUrl, setCheckInProofUrl] = useState<string>("");
+  const [checkInError, setCheckInError] = useState<string>("");
+  
   // Loading states for preventing double submissions
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
   const [deletingBooking, setDeletingBooking] = useState<boolean>(false);
+  const [processingCheckIn, setProcessingCheckIn] = useState<boolean>(false);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -67,26 +76,89 @@ export default function BookingsPage() {
 
   // Helper functions for managing multiple rooms
   const addRoom = () => {
-    setBookingRooms([...bookingRooms, {
+    const newRooms = [...bookingRooms, {
       roomId: "",
       check_in_date: "",
       check_out_date: "",
       price: 0,
       discount: 0
-    }]);
+    }];
+    setBookingRooms(newRooms);
   };
 
   const removeRoom = (index: number) => {
     const newRooms = bookingRooms.filter((_, i) => i !== index);
-    setBookingRooms(newRooms);
-    calculateTotalPrice(newRooms);
+    
+    // Reapply package coverage after removing room
+    const roomsWithPackage = applyPackageCoverage(newRooms);
+    setBookingRooms(roomsWithPackage);
+    calculateTotalPrice(roomsWithPackage);
   };
 
   const updateRoom = (index: number, field: keyof CreateBookingRoomRequest, value: string | number) => {
     const newRooms = [...bookingRooms];
     newRooms[index] = { ...newRooms[index], [field]: value };
-    setBookingRooms(newRooms);
-    calculateTotalPrice(newRooms);
+    
+    // Reapply package coverage after updating room
+    const roomsWithPackage = applyPackageCoverage(newRooms);
+    setBookingRooms(roomsWithPackage);
+    calculateTotalPrice(roomsWithPackage);
+  };
+
+  // Helper function to apply package coverage to rooms
+  const applyPackageCoverage = (rooms: CreateBookingRoomRequest[]) => {
+    const packageExtra = bookingExtras.find(e => e.isPackage && e.includedNights);
+    
+    if (!packageExtra || !packageExtra.includedNights) {
+      // No package, calculate normal prices
+      return rooms.map(room => ({
+        ...room,
+        price: calculateRoomPrice(room.roomId, room.check_in_date, room.check_out_date),
+        discount: room.discount || 0
+      }));
+    }
+    
+    // Apply package coverage
+    const updatedRooms = [...rooms];
+    let remainingPackageNights = packageExtra.includedNights;
+    
+    for (let i = 0; i < updatedRooms.length; i++) {
+      if (!updatedRooms[i].check_in_date || !updatedRooms[i].check_out_date || !updatedRooms[i].roomId) {
+        // Room not fully filled yet, keep price at 0
+        updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+        continue;
+      }
+      
+      const checkIn = new Date(updatedRooms[i].check_in_date);
+      const checkOut = new Date(updatedRooms[i].check_out_date);
+      const roomNights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (remainingPackageNights <= 0) {
+        // Package exhausted, charge normal price
+        updatedRooms[i] = {
+          ...updatedRooms[i],
+          price: calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date),
+          discount: 0
+        };
+      } else if (roomNights <= remainingPackageNights) {
+        // This entire room is covered by the package
+        updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+        remainingPackageNights -= roomNights;
+      } else {
+        // Package partially covers this room
+        const originalPrice = calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date);
+        const pricePerNight = originalPrice / roomNights;
+        const uncoveredNights = roomNights - remainingPackageNights;
+        updatedRooms[i] = { 
+          ...updatedRooms[i], 
+          price: pricePerNight * uncoveredNights, 
+          discount: 0 
+        };
+        remainingPackageNights = 0;
+      }
+    }
+    
+    return updatedRooms;
   };
 
   const calculateRoomPrice = (roomId: string, checkIn: string, checkOut: string): number => {
@@ -103,9 +175,9 @@ export default function BookingsPage() {
   };
 
   const calculateTotalPrice = (rooms: CreateBookingRoomRequest[], extras: CreateBookingExtraRequest[] = bookingExtras) => {
+    // Use the room.price that was already calculated (which includes package coverage)
     const roomsTotal = rooms.reduce((sum, room) => {
-      const roomPrice = calculateRoomPrice(room.roomId, room.check_in_date, room.check_out_date);
-      return sum + roomPrice - (room.discount || 0);
+      return sum + (room.price || 0) - (room.discount || 0);
     }, 0);
     
     const extrasTotal = extras.reduce((sum, extra) => {
@@ -118,6 +190,7 @@ export default function BookingsPage() {
   // Helper functions for managing extras
   const addExtra = () => {
     const newExtras = [...bookingExtras, {
+      extraId: "",
       label: "",
       price: 0,
       quantity: 1
@@ -267,13 +340,30 @@ export default function BookingsPage() {
     }
   };
 
+  const fetchExtras = async () => {
+    try {
+      const res = await fetch("/api/extras");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setExtras(data);
+      } else {
+        console.error('Extras API returned non-array data:', data);
+        setExtras([]);
+      }
+    } catch (error) {
+      console.error('Error fetching extras:', error);
+      setExtras([]);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       await Promise.all([
         fetchBookings(),
         fetchGuests(),
-        fetchRooms()
+        fetchRooms(),
+        fetchExtras()
       ]);
       setLoading(false);
     };
@@ -304,13 +394,30 @@ export default function BookingsPage() {
       // Set booking discount
       setBookingDiscount(booking.discount === 0 ? '' : booking.discount.toString());
       
-      // Convert booking extras to the form format
-      const extras = booking.booking_extras?.map(ex => ({
-        label: ex.label,
-        price: ex.price,
-        quantity: ex.quantity
-      })) || [];
-      setBookingExtras(extras);
+      // Set booking note
+      setBookingNote(booking.note || '');
+      
+      // Convert booking extras to the form format and fetch package info
+      const extrasWithPackageInfo = booking.booking_extras?.map(ex => {
+        // Find the full extra details to get package info
+        const fullExtra = extras.find(e => e.id === ex.extra_id?.toString());
+        return {
+          extraId: ex.extra_id?.toString() || '',
+          label: ex.label,
+          price: ex.price,
+          quantity: ex.quantity,
+          isPackage: fullExtra ? (fullExtra as any).is_package || false : false,
+          includedNights: fullExtra ? (fullExtra as any).included_nights || null : null
+        };
+      }) || [];
+      setBookingExtras(extrasWithPackageInfo);
+      
+      // Apply package coverage to the rooms after loading extras
+      setTimeout(() => {
+        const roomsWithPackage = applyPackageCoverage(rooms);
+        setBookingRooms(roomsWithPackage);
+        calculateTotalPrice(roomsWithPackage, extrasWithPackageInfo);
+      }, 0);
       
       setTotalPrice(booking.total_price);
     } else {
@@ -318,6 +425,7 @@ export default function BookingsPage() {
       setBookingExtras([]);
       setTotalPrice(0);
       setBookingDiscount("");
+      setBookingNote("");
     }
     setModalOpen(true);
   };
@@ -332,10 +440,9 @@ export default function BookingsPage() {
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    // Validate that we have at least one room
-    // Only require rooms when creating a new booking, not when editing
-    if (bookingRooms.length === 0 && !editingBooking) {
-      setError('Please add at least one room to the booking');
+    // Validate that we have at least one room OR at least one extra
+    if (bookingRooms.length === 0 && bookingExtras.length === 0) {
+      setError('Please add at least one room or extra to the booking');
       return;
     }
 
@@ -394,6 +501,7 @@ export default function BookingsPage() {
       booking_extras: bookingExtras,
       total_price: totalPrice,
       discount: bookingDiscount === '' ? 0 : Number(bookingDiscount),
+      note: bookingNote || undefined,
     };
 
     console.log('Submitting booking with payload:', payload);
@@ -609,11 +717,147 @@ export default function BookingsPage() {
     }
   };
 
+  // Handle check-in submission
+  const handleCheckInSubmit = async () => {
+    if (!checkInBookingId || !checkInProofUrl) {
+      setCheckInError("Proof image URL is required");
+      return;
+    }
+
+    if (processingCheckIn) return; // Prevent double submission
+
+    setProcessingCheckIn(true);
+    try {
+      const response = await fetch(`/api/bookings/${checkInBookingId}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ proofImageUrl: checkInProofUrl }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        await fetchBookings();
+        toast.success("Guest checked in successfully!");
+        setCheckInModalOpen(false);
+        setCheckInProofUrl("");
+        setCheckInError("");
+      } else {
+        setCheckInError(data.error || 'Failed to check in');
+      }
+    } catch (error) {
+      setCheckInError('Error processing check-in');
+    } finally {
+      setProcessingCheckIn(false);
+    }
+  };
+
+  // Open check-in modal
+  const openCheckInModal = (bookingId: number) => {
+    setCheckInBookingId(bookingId);
+    setCheckInProofUrl("");
+    setCheckInError("");
+    setCheckInModalOpen(true);
+  };
+
   const handlePartialPaymentInputChange = (value: string) => {
     // Only allow whole numbers (no decimals, no negative signs)
     const cleanValue = value.replace(/[^0-9]/g, '');
     setPartialPaymentAmount(cleanValue);
     setPartialPaymentError("");
+  };
+
+  // Export bookings to CSV
+  const exportBookingsCSV = () => {
+    if (filteredBookings.length === 0) {
+      toast.error("No bookings to export");
+      return;
+    }
+
+    // Create CSV headers
+    const headers = [
+      "Booking ID",
+      "Guest Name",
+      "Email",
+      "Phone",
+      "Status",
+      "Check-in Date",
+      "Check-out Date",
+      "Rooms",
+      "Extras",
+      "Total Price",
+      "Discount",
+      "Total Paid",
+      "Remaining",
+      "Payment Status",
+      "Note",
+      "Created At"
+    ];
+
+    // Create CSV rows
+    const rows = filteredBookings.map(booking => {
+      const roomsText = booking.booking_rooms.map(br => 
+        `Room ${rooms.find(r => r.id === br.room_id)?.room_number || br.room_id} (${new Date(br.check_in_date).toLocaleDateString()} - ${new Date(br.check_out_date).toLocaleDateString()})`
+      ).join('; ');
+      
+      const extrasText = booking.booking_extras.map(ex => 
+        `${ex.label} x${ex.quantity}`
+      ).join('; ');
+
+      const paymentStatus = booking.remaining <= 0 ? 'Fully Paid' : 
+                           booking.total_paid > 0 ? 'Partially Paid' : 'Unpaid';
+
+      const earliestCheckIn = booking.booking_rooms.length > 0 
+        ? new Date(Math.min(...booking.booking_rooms.map(br => new Date(br.check_in_date).getTime()))).toLocaleDateString()
+        : 'N/A';
+      
+      const latestCheckOut = booking.booking_rooms.length > 0
+        ? new Date(Math.max(...booking.booking_rooms.map(br => new Date(br.check_out_date).getTime()))).toLocaleDateString()
+        : 'N/A';
+
+      return [
+        booking.id,
+        booking.guest.name,
+        booking.guest.email || '',
+        booking.guest.phone || '',
+        booking.status,
+        earliestCheckIn,
+        latestCheckOut,
+        roomsText || 'No rooms',
+        extrasText || 'No extras',
+        booking.total_price.toFixed(2),
+        booking.discount.toFixed(2),
+        booking.total_paid.toFixed(2),
+        booking.remaining.toFixed(2),
+        paymentStatus,
+        booking.note || '',
+        new Date(booking.created_at).toLocaleDateString()
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const monthText = selectedMonth 
+      ? new Date(selectedMonth + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+      : 'All';
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Bookings_${monthText}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${filteredBookings.length} bookings!`);
   };
 
   if (loading) {
@@ -761,7 +1005,7 @@ export default function BookingsPage() {
               <option value="unpaid">Unpaid</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={() => {
                 setSelectedMonth("");
@@ -769,9 +1013,15 @@ export default function BookingsPage() {
                 setGuestSearchTerm("");
                 setSelectedStatus("");
               }}
-              className="w-full px-4 py-3 bg-gradient-to-r from-stone-500 to-stone-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-stone-500 to-stone-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
             >
               🗑️ Clear Filters
+            </button>
+            <button
+              onClick={exportBookingsCSV}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+            >
+              📥 Export CSV
             </button>
           </div>
         </div>
@@ -880,6 +1130,17 @@ export default function BookingsPage() {
                     disabled={isPaid || processingPayment}
                   >
                     {processingPayment ? 'Processing...' : 'Partial Paid'}
+                  </button>
+                  <button
+                    className={`px-2 py-1 rounded mx-1 ${
+                      b.status === 'checked_in' || processingCheckIn
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-amber-700 text-white hover:bg-amber-800'
+                    }`}
+                    onClick={() => openCheckInModal(Number(b.id))}
+                    disabled={b.status === 'checked_in' || processingCheckIn}
+                  >
+                    {b.status === 'checked_in' ? 'Checked In' : 'Check In'}
                   </button>
                 </td>
               </tr>
@@ -1002,6 +1263,17 @@ export default function BookingsPage() {
               >
                 {processingPayment ? 'Processing...' : 'Partial Paid'}
               </button>
+              <button
+                className={`flex-1 px-3 py-2 rounded text-sm ${
+                  b.status === 'checked_in' || processingCheckIn
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-amber-700 text-white hover:bg-amber-800'
+                }`}
+                onClick={() => openCheckInModal(Number(b.id))}
+                disabled={b.status === 'checked_in' || processingCheckIn}
+              >
+                {b.status === 'checked_in' ? 'Checked In' : 'Check In'}
+              </button>
             </div>
           </div>
         );
@@ -1107,10 +1379,16 @@ export default function BookingsPage() {
                 <select
                   name="guest_id"
                   defaultValue={editingBooking?.guest_id || ""}
+                  onChange={(e) => {
+                    if (e.target.value === "add_new") {
+                      window.location.href = "/guests";
+                    }
+                  }}
                   className="w-full border border-gray-300 rounded p-2 bg-white text-black"
                   required
                 >
                   <option value="">Select Guest</option>
+                  <option value="add_new" className="bg-amber-50 font-semibold text-amber-800">+ Add New Guest</option>
                   {guests.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -1138,10 +1416,40 @@ export default function BookingsPage() {
                   </div>
                 )}
 
-                {bookingRooms.map((room, index) => (
+                {bookingRooms.map((room, index) => {
+                  // Check if this room is included in a package based on room-nights
+                  const packageExtra = bookingExtras.find(e => e.isPackage && e.includedNights);
+                  let isIncludedInPackage = false;
+                  
+                  if (packageExtra && packageExtra.includedNights) {
+                    // Calculate cumulative room-nights up to this room
+                    let cumulativeNights = 0;
+                    for (let i = 0; i <= index; i++) {
+                      const checkIn = new Date(bookingRooms[i].check_in_date);
+                      const checkOut = new Date(bookingRooms[i].check_out_date);
+                      const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                      if (i < index) {
+                        cumulativeNights += nights;
+                      } else {
+                        // For current room, check if any nights are covered
+                        if (cumulativeNights < packageExtra.includedNights) {
+                          isIncludedInPackage = true;
+                        }
+                      }
+                    }
+                  }
+                  
+                  return (
                   <div key={index} className="border border-gray-300 rounded p-3 mb-3 bg-gray-50">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-black">Room {index + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-black">Room {index + 1}</span>
+                        {isIncludedInPackage && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-semibold">
+                            📦 Included in Package
+                          </span>
+                        )}
+                      </div>
                       {bookingRooms.length > 1 && (
                         <button
                           type="button"
@@ -1224,13 +1532,13 @@ export default function BookingsPage() {
               <div>
                         <label className="block text-sm font-medium text-black mb-1">Discount (₱)</label>
                         <input
-                          type="number"
-                          step="1"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={room.discount === 0 ? '' : room.discount}
                           onChange={(e) => {
-                            const value = e.target.value === '' ? 0 : Math.floor(Number(e.target.value));
-                            updateRoom(index, 'discount', value);
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            updateRoom(index, 'discount', value === '' ? 0 : parseInt(value));
                           }}
                           className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
                           placeholder="0"
@@ -1238,7 +1546,8 @@ export default function BookingsPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Additional Extras Section */}
@@ -1257,6 +1566,8 @@ export default function BookingsPage() {
                 {bookingExtras.length === 0 && (
                   <div className="text-gray-500 text-sm italic mb-3">
                     Click "Add Extra" to add extras like towels, motorcycle rental, tours, etc.
+                    <br />
+                    <span className="text-purple-600 font-semibold">💡 Tip: Select a Package to include room nights at no extra charge!</span>
                   </div>
                 )}
 
@@ -1275,30 +1586,86 @@ export default function BookingsPage() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-black mb-1">Item</label>
-                        <input
-                          type="text"
-                          value={extra.label}
-                          onChange={(e) => updateExtra(index, 'label', e.target.value)}
-                          placeholder="e.g., Extra Towel, Motorcycle, Tour"
+                        <label className="block text-sm font-medium text-black mb-1">Service/Tour</label>
+                        <select
+                          value={extra.extraId || ''}
+                          onChange={(e) => {
+                            const selectedExtra = extras.find(ex => ex.id === e.target.value);
+                            if (selectedExtra) {
+                              const newExtras = [...bookingExtras];
+                              newExtras[index] = {
+                                ...newExtras[index],
+                                extraId: e.target.value,
+                                label: selectedExtra.name,
+                                price: Number(selectedExtra.price),
+                                isPackage: (selectedExtra as any).is_package || false,
+                                includedNights: (selectedExtra as any).included_nights || null
+                              };
+                              setBookingExtras(newExtras);
+                              
+                              // If it's a package, allocate free room-nights based on total nights
+                              if ((selectedExtra as any).is_package && (selectedExtra as any).included_nights) {
+                                const updatedRooms = [...bookingRooms];
+                                const packageNights = (selectedExtra as any).included_nights;
+                                let remainingPackageNights = packageNights;
+                                
+                                // Calculate nights for each room and allocate package coverage
+                                for (let i = 0; i < updatedRooms.length && remainingPackageNights > 0; i++) {
+                                  const checkIn = new Date(updatedRooms[i].check_in_date);
+                                  const checkOut = new Date(updatedRooms[i].check_out_date);
+                                  const roomNights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                                  
+                                  if (roomNights <= remainingPackageNights) {
+                                    // This entire room is covered by the package
+                                    updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+                                    remainingPackageNights -= roomNights;
+                                  } else {
+                                    // Package partially covers this room
+                                    // Calculate the original price per night
+                                    const originalPrice = calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date);
+                                    const pricePerNight = originalPrice / roomNights;
+                                    const uncoveredNights = roomNights - remainingPackageNights;
+                                    updatedRooms[i] = { 
+                                      ...updatedRooms[i], 
+                                      price: pricePerNight * uncoveredNights, 
+                                      discount: 0 
+                                    };
+                                    remainingPackageNights = 0;
+                                  }
+                                }
+                                
+                                setBookingRooms(updatedRooms);
+                                calculateTotalPrice(updatedRooms, newExtras);
+                              } else {
+                                calculateTotalPrice(bookingRooms, newExtras);
+                              }
+                            }
+                          }}
                           className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
                           required
-                        />
+                        >
+                          <option value="">Select an extra...</option>
+                          {extras.map(ex => (
+                            <option key={ex.id} value={ex.id}>
+                              {ex.name} - ₱{Number(ex.price).toFixed(2)}
+                              {(ex as any).is_package && (ex as any).included_nights ? ` (Package: ${(ex as any).included_nights}N included)` : ''}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium text-black mb-1">Price (₱)</label>
-                <input
-                  type="number"
-                  step="0.01"
+                        <input
+                          type="number"
+                          step="0.01"
                           value={extra.price}
-                          onChange={(e) => updateExtra(index, 'price', Number(e.target.value))}
-                          className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
-                  required
-                />
-              </div>
+                          readOnly
+                          className="w-full border border-gray-300 rounded p-2 bg-gray-100 text-black text-sm cursor-not-allowed"
+                        />
+                      </div>
 
-              <div>
+                      <div>
                         <label className="block text-sm font-medium text-black mb-1">Quantity</label>
                         <input
                           type="number"
@@ -1326,16 +1693,28 @@ export default function BookingsPage() {
               <div>
                 <label className="block font-semibold mb-1 text-black">Booking Discount (₱)</label>
                 <input
-                  type="number"
-                  step="1"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={bookingDiscount}
                   onChange={(e) => {
-                    const value = e.target.value === '' ? '' : Math.floor(Number(e.target.value)).toString();
+                    const value = e.target.value.replace(/[^0-9]/g, '');
                     setBookingDiscount(value);
                   }}
                   className="w-full border border-gray-300 rounded p-2 bg-white text-black"
                   placeholder="0"
+                />
+              </div>
+
+              {/* Booking Note */}
+              <div>
+                <label className="block font-semibold mb-1 text-black">Note (Optional)</label>
+                <textarea
+                  value={bookingNote}
+                  onChange={(e) => setBookingNote(e.target.value)}
+                  className="w-full border border-gray-300 rounded p-2 bg-white text-black"
+                  placeholder="Add any special notes or requests..."
+                  rows={3}
                 />
               </div>
 
@@ -1497,15 +1876,19 @@ export default function BookingsPage() {
                             <div className="flex items-center gap-2">
                               <span className="text-black font-medium">₱</span>
                               <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={editingPaymentAmount}
-                                onChange={(e) => setEditingPaymentAmount(e.target.value)}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/[^0-9]/g, '');
+                                  setEditingPaymentAmount(value);
+                                }}
                                 className="flex-1 border border-gray-300 rounded px-2 py-1 text-black"
                                 autoFocus
                               />
                               <button
-                                onClick={() => handleUpdatePayment(payment.id, parseFloat(editingPaymentAmount))}
+                                onClick={() => handleUpdatePayment(payment.id, parseInt(editingPaymentAmount))}
                                 className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
                               >
                                 Save
@@ -1631,6 +2014,79 @@ export default function BookingsPage() {
                   type="button"
                   onClick={() => setPartialPaymentModalOpen(false)}
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Check-In Modal */}
+      <Dialog
+        open={checkInModalOpen}
+        onClose={() => setCheckInModalOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl border-2 border-stone-200">
+            <Dialog.Title className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <span className="text-3xl">📸</span> Check-In Guest
+            </Dialog.Title>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> Check-in is only allowed on the check-in date. Please provide a picture URL of the guest for verification.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Proof Image URL <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={checkInProofUrl}
+                  onChange={(e) => {
+                    setCheckInProofUrl(e.target.value);
+                    setCheckInError("");
+                  }}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+                  disabled={processingCheckIn}
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  Enter the URL of the proof image (e.g., from Google Drive, Dropbox, or image hosting)
+                </p>
+              </div>
+
+              {checkInError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
+                  <p className="text-sm text-red-700">{checkInError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCheckInSubmit}
+                  disabled={processingCheckIn || !checkInProofUrl}
+                  className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    processingCheckIn || !checkInProofUrl
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-amber-700 to-amber-900 text-white hover:shadow-lg hover:scale-105'
+                  }`}
+                >
+                  {processingCheckIn ? 'Checking In...' : '✓ Check In Guest'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckInModalOpen(false)}
+                  disabled={processingCheckIn}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-400 transition-colors font-semibold"
                 >
                   Cancel
                 </button>

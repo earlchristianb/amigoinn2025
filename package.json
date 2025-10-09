@@ -9,7 +9,7 @@
     "lint": "eslint",
     "populate-rooms": "tsx scripts/populate-rooms.ts",
     "clear-and-reseed": "tsx scripts/clear-and-reseed.ts",
-    "add-admin-emails": "tsx scripts/add-admin-emails.ts",
+    "add-admin-profiles": "tsx scripts/add-admin-emails.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

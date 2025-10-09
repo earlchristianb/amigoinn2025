@@ -21,6 +21,9 @@ export default function GuestsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalGuests, setTotalGuests] = useState(0);
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch guests
   const fetchGuests = async () => {
@@ -55,11 +58,22 @@ export default function GuestsPage() {
     }
   };
 
-  // Calculate pagination
-  const totalPages = Math.ceil(totalGuests / pageSize);
+  // Filter guests based on search term
+  const filteredGuests = Array.isArray(guests) ? guests.filter(guest => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      guest.name.toLowerCase().includes(term) ||
+      (guest.email && guest.email.toLowerCase().includes(term)) ||
+      (guest.phone && guest.phone.includes(term))
+    );
+  }) : [];
+
+  // Calculate pagination based on filtered results
+  const totalPages = Math.ceil(filteredGuests.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedGuests = Array.isArray(guests) ? guests.slice(startIndex, endIndex) : [];
+  const paginatedGuests = filteredGuests.slice(startIndex, endIndex);
 
   // Reset to first page when page size changes
   const handlePageSizeChange = (newPageSize: number) => {
@@ -70,6 +84,11 @@ export default function GuestsPage() {
   useEffect(() => {
     fetchGuests();
   }, []);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const openAddModal = () => {
     setEditingGuest(null);
@@ -188,6 +207,40 @@ export default function GuestsPage() {
         {/* Main Content - Only show when not loading and no error */}
         {!loading && !error && (
           <>
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-stone-200">
+                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                  🔍 Search Guests
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name, email, or phone..."
+                    className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800 pr-10"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Clear search"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {searchTerm && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    Found {filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''} matching "{searchTerm}"
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="mb-4 flex justify-between items-center">
         <button
           className="px-4 py-2 bg-amber-700 text-white rounded hover:bg-amber-800"
@@ -214,44 +267,73 @@ export default function GuestsPage() {
           </div>
           
           <div className="text-gray-700">
-            Showing {startIndex + 1} to {Math.min(endIndex, totalGuests)} of {totalGuests} entries
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredGuests.length)} of {filteredGuests.length} entries
+            {searchTerm && ` (filtered from ${totalGuests} total)`}
           </div>
         </div>
       </div>
 
-      <table className="w-full border-collapse border border-black">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border border-black p-2 text-black font-bold">Name</th>
-            <th className="border border-black p-2 text-black font-bold">Email</th>
-            <th className="border border-black p-2 text-black font-bold">Phone</th>
-            <th className="border border-black p-2 text-black font-bold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedGuests.map((guest) => (
-            <tr key={guest.id} className="hover:bg-gray-50">
-              <td className="border border-black p-2 text-black">{guest.name}</td>
-              <td className="border border-black p-2 text-black">{guest.email || "-"}</td>
-              <td className="border border-black p-2 text-black">{guest.phone || "-"}</td>
-              <td className="border border-black p-2 text-center">
-                <button
-                  className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mx-1"
-                  onClick={() => openEditModal(guest)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mx-1"
-                  onClick={() => handleDelete(Number(guest.id))}
-                >
-                  Delete
-                </button>
-              </td>
+      {paginatedGuests.length === 0 ? (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-12 border border-stone-200 text-center">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No guests found</h3>
+          <p className="text-gray-600 mb-4">
+            {searchTerm 
+              ? `No guests match your search "${searchTerm}"`
+              : "No guests have been added yet"
+            }
+          </p>
+          {searchTerm ? (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="px-6 py-3 bg-gradient-to-r from-amber-700 to-amber-900 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+            >
+              Clear Search
+            </button>
+          ) : (
+            <button
+              onClick={openAddModal}
+              className="px-6 py-3 bg-gradient-to-r from-amber-700 to-amber-900 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+            >
+              Add First Guest
+            </button>
+          )}
+        </div>
+      ) : (
+        <table className="w-full border-collapse border border-black">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border border-black p-2 text-black font-bold">Name</th>
+              <th className="border border-black p-2 text-black font-bold">Email</th>
+              <th className="border border-black p-2 text-black font-bold">Phone</th>
+              <th className="border border-black p-2 text-black font-bold">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {paginatedGuests.map((guest) => (
+              <tr key={guest.id} className="hover:bg-gray-50">
+                <td className="border border-black p-2 text-black">{guest.name}</td>
+                <td className="border border-black p-2 text-black">{guest.email || "-"}</td>
+                <td className="border border-black p-2 text-black">{guest.phone || "-"}</td>
+                <td className="border border-black p-2 text-center">
+                  <button
+                    className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 mx-1"
+                    onClick={() => openEditModal(guest)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mx-1"
+                    onClick={() => handleDelete(Number(guest.id))}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (

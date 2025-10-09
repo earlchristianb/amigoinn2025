@@ -6,6 +6,7 @@ import { Room, CreateRoomRequest } from "@/types";
 export async function GET(req: NextRequest) {
   try {
     const rooms = await prisma.room.findMany({
+      where: { deletedAt: null },
       include: {
         roomType: true, // include room type info
       },
