@@ -211,11 +211,11 @@ export default function UsersPage() {
                     <td className="p-4">
                       {user.role === 'admin' ? (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                          👑 Admin
+                          Admin
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                          👤 Assistant
+                          Assistant
                         </span>
                       )}
                     </td>
@@ -289,8 +289,8 @@ export default function UsersPage() {
                   onChange={(e) => setRole(e.target.value as 'admin' | 'assistant')}
                   disabled={submitting}
                 >
-                  <option value="assistant">👤 Assistant</option>
-                  <option value="admin">👑 Admin</option>
+                  <option value="assistant">Assistant</option>
+                  <option value="admin">Admin</option>
                 </select>
                 <p className="text-xs text-gray-600 mt-2">
                   <strong>Admin:</strong> Full access to all features including reports and user management<br />
