@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Booking, CreateBookingRequest } from "@/types";
+import { CreateBookingRequest } from "@/types";
 
 // GET /api/bookings
 export async function GET(req: NextRequest) {
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     }
 
     const bookings = await prisma.booking.findMany({
-      where: Object.keys(whereClause).length > 0 ? whereClause : {},
+      where: { ...whereClause, deletedAt: null },
       include: {
         guest: true,
         bookingRooms: {
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     // Calculate remaining and serialize BigInt values
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const formatted: Booking[] = bookings.map((b: any) => {
+    const formatted = bookings.map((b: any) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalPaid = b.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
       const remaining = Number(b.totalPrice) - totalPaid - Number(b.discount || 0);
@@ -95,6 +95,9 @@ export async function GET(req: NextRequest) {
         guest_id: b.guestId.toString(),
         total_price: Number(b.totalPrice),
         discount: Number(b.discount || 0),
+        status: b.status,
+        proof_image_url: b.proofImageUrl,
+        note: (b as any).note || null,
         created_at: b.createdAt.toISOString(),
         updated_at: b.updatedAt.toISOString(),
         guest: {
@@ -133,6 +136,7 @@ export async function GET(req: NextRequest) {
       booking_extras: b.bookingExtras?.map((ex: any) => ({
         id: ex.id.toString(),
         booking_id: ex.bookingId.toString(),
+        extra_id: ex.extraId ? ex.extraId.toString() : null,
         label: ex.label,
         price: Number(ex.price),
         quantity: ex.quantity,
@@ -169,17 +173,32 @@ export async function GET(req: NextRequest) {
 // POST /api/bookings
 export async function POST(req: NextRequest) {
   try {
-    const { guestId, booking_rooms, booking_extras, total_price, discount }: CreateBookingRequest =
-      await req.json();
+    const data: CreateBookingRequest = await req.json();
+    const { guestId, total_price, discount, note } = data;
+    let { booking_rooms, booking_extras } = data;
 
-    console.log('Received booking data:', { guestId, booking_rooms, total_price, discount });
+    console.log('Received booking data:', { guestId, booking_rooms, total_price, discount, note });
     console.log('GuestId type:', typeof guestId, 'Value:', guestId);
-    console.log('Booking rooms count:', booking_rooms.length);
+    console.log('Booking rooms count:', booking_rooms?.length);
     console.log('Total price type:', typeof total_price, 'Value:', total_price);
 
-    if (!guestId || !booking_rooms || !Array.isArray(booking_rooms) || booking_rooms.length === 0) {
-      console.log('Missing required fields:', { guestId, booking_rooms, total_price });
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    // Validate that we have either rooms or extras
+    if (!guestId) {
+      console.log('Missing required fields:', { guestId });
+      return NextResponse.json({ error: "Guest ID is required" }, { status: 400 });
+    }
+
+    if (!Array.isArray(booking_rooms)) {
+      booking_rooms = [];
+    }
+
+    if (!Array.isArray(booking_extras)) {
+      booking_extras = [];
+    }
+
+    if (booking_rooms.length === 0 && booking_extras.length === 0) {
+      console.log('No rooms or extras provided');
+      return NextResponse.json({ error: "At least one room or extra is required" }, { status: 400 });
     }
 
     if (total_price === undefined || total_price === null) {
@@ -325,11 +344,13 @@ export async function POST(req: NextRequest) {
         guestId: guestIdBigInt,
         totalPrice: Number(total_price),
         discount: Number(discount || 0),
-        bookingRooms: {
+        note: note || null,
+        bookingRooms: validatedRooms.length > 0 ? {
           create: validatedRooms
-        },
+        } : undefined,
         bookingExtras: booking_extras && booking_extras.length > 0 ? {
           create: booking_extras.map(extra => ({
+            extraId: extra.extraId ? BigInt(extra.extraId) : null,
             label: extra.label,
             price: Number(extra.price),
             quantity: extra.quantity || 1,
@@ -356,6 +377,9 @@ export async function POST(req: NextRequest) {
       guest_id: booking.guestId.toString(),
       total_price: Number(booking.totalPrice),
       discount: Number(booking.discount || 0),
+      status: (booking as any).status || 'pending',
+      proof_image_url: (booking as any).proofImageUrl || null,
+      note: (booking as any).note || null,
       created_at: booking.createdAt.toISOString(),
       updated_at: booking.updatedAt.toISOString(),
       guest: {
@@ -392,6 +416,7 @@ export async function POST(req: NextRequest) {
       booking_extras: booking.bookingExtras?.map((ex: any) => ({
         id: ex.id.toString(),
         booking_id: ex.bookingId.toString(),
+        extra_id: ex.extraId ? ex.extraId.toString() : null,
         label: ex.label,
         price: Number(ex.price),
         quantity: ex.quantity,

@@ -6,12 +6,14 @@ import { Booking, Guest, Room, BookingFormData, CreateBookingRoomRequest, Create
 import AdminNavigation from "@/components/AdminNavigation";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from 'react-hot-toast';
+import imageCompression from 'browser-image-compression';
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [extras, setExtras] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -20,6 +22,7 @@ export default function BookingsPage() {
   const [bookingExtras, setBookingExtras] = useState<CreateBookingExtraRequest[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [bookingDiscount, setBookingDiscount] = useState<string>("");
+  const [bookingNote, setBookingNote] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   
@@ -27,7 +30,14 @@ export default function BookingsPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [monthFilterType, setMonthFilterType] = useState<string>("created_at"); // Default to "created_at"
   const [selectedGuest, setSelectedGuest] = useState<string>("");
+  const [guestSearchTerm, setGuestSearchTerm] = useState<string>("");
+  const [showGuestDropdown, setShowGuestDropdown] = useState<boolean>(false);
   const [selectedStatus, setSelectedStatus] = useState<string>("");
+  
+  // Booking modal guest search states
+  const [bookingModalGuestSearch, setBookingModalGuestSearch] = useState<string>("");
+  const [bookingModalGuestId, setBookingModalGuestId] = useState<string>("");
+  const [showBookingModalGuestDropdown, setShowBookingModalGuestDropdown] = useState<boolean>(false);
   
   // Payment edit state
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
@@ -39,37 +49,129 @@ export default function BookingsPage() {
   const [partialPaymentAmount, setPartialPaymentAmount] = useState<string>("");
   const [partialPaymentError, setPartialPaymentError] = useState<string>("");
   
+  // Check-in modal state
+  const [checkInModalOpen, setCheckInModalOpen] = useState<boolean>(false);
+  const [checkInBookingId, setCheckInBookingId] = useState<number | null>(null);
+  const [checkInProofUrl, setCheckInProofUrl] = useState<string>("");
+  const [checkInError, setCheckInError] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  
   // Loading states for preventing double submissions
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
   const [processingPayment, setProcessingPayment] = useState<boolean>(false);
   const [deletingBooking, setDeletingBooking] = useState<boolean>(false);
+  const [processingCheckIn, setProcessingCheckIn] = useState<boolean>(false);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
 
+  // Close guest dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.guest-search-container')) {
+        setShowGuestDropdown(false);
+      }
+      if (!target.closest('.booking-modal-guest-search')) {
+        setShowBookingModalGuestDropdown(false);
+      }
+    };
+
+    if (showGuestDropdown || showBookingModalGuestDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showGuestDropdown, showBookingModalGuestDropdown]);
+
   // Helper functions for managing multiple rooms
   const addRoom = () => {
-    setBookingRooms([...bookingRooms, {
+    const newRooms = [...bookingRooms, {
       roomId: "",
       check_in_date: "",
       check_out_date: "",
       price: 0,
       discount: 0
-    }]);
+    }];
+    setBookingRooms(newRooms);
   };
 
   const removeRoom = (index: number) => {
     const newRooms = bookingRooms.filter((_, i) => i !== index);
-    setBookingRooms(newRooms);
-    calculateTotalPrice(newRooms);
+    
+    // Reapply package coverage after removing room
+    const roomsWithPackage = applyPackageCoverage(newRooms);
+    setBookingRooms(roomsWithPackage);
+    calculateTotalPrice(roomsWithPackage);
   };
 
   const updateRoom = (index: number, field: keyof CreateBookingRoomRequest, value: string | number) => {
     const newRooms = [...bookingRooms];
     newRooms[index] = { ...newRooms[index], [field]: value };
-    setBookingRooms(newRooms);
-    calculateTotalPrice(newRooms);
+    
+    // Reapply package coverage after updating room
+    const roomsWithPackage = applyPackageCoverage(newRooms);
+    setBookingRooms(roomsWithPackage);
+    calculateTotalPrice(roomsWithPackage);
+  };
+
+  // Helper function to apply package coverage to rooms
+  const applyPackageCoverage = (rooms: CreateBookingRoomRequest[]) => {
+    const packageExtra = bookingExtras.find(e => e.isPackage && e.includedNights);
+    
+    if (!packageExtra || !packageExtra.includedNights) {
+      // No package, calculate normal prices
+      return rooms.map(room => ({
+        ...room,
+        price: calculateRoomPrice(room.roomId, room.check_in_date, room.check_out_date),
+        discount: room.discount || 0
+      }));
+    }
+    
+    // Apply package coverage
+    const updatedRooms = [...rooms];
+    let remainingPackageNights = packageExtra.includedNights;
+    
+    for (let i = 0; i < updatedRooms.length; i++) {
+      if (!updatedRooms[i].check_in_date || !updatedRooms[i].check_out_date || !updatedRooms[i].roomId) {
+        // Room not fully filled yet, keep price at 0
+        updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+        continue;
+      }
+      
+      const checkIn = new Date(updatedRooms[i].check_in_date);
+      const checkOut = new Date(updatedRooms[i].check_out_date);
+      const roomNights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (remainingPackageNights <= 0) {
+        // Package exhausted, charge normal price
+        updatedRooms[i] = {
+          ...updatedRooms[i],
+          price: calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date),
+          discount: 0
+        };
+      } else if (roomNights <= remainingPackageNights) {
+        // This entire room is covered by the package
+        updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+        remainingPackageNights -= roomNights;
+      } else {
+        // Package partially covers this room
+        const originalPrice = calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date);
+        const pricePerNight = originalPrice / roomNights;
+        const uncoveredNights = roomNights - remainingPackageNights;
+        updatedRooms[i] = { 
+          ...updatedRooms[i], 
+          price: pricePerNight * uncoveredNights, 
+          discount: 0 
+        };
+        remainingPackageNights = 0;
+      }
+    }
+    
+    return updatedRooms;
   };
 
   const calculateRoomPrice = (roomId: string, checkIn: string, checkOut: string): number => {
@@ -86,9 +188,9 @@ export default function BookingsPage() {
   };
 
   const calculateTotalPrice = (rooms: CreateBookingRoomRequest[], extras: CreateBookingExtraRequest[] = bookingExtras) => {
+    // Use the room.price that was already calculated (which includes package coverage)
     const roomsTotal = rooms.reduce((sum, room) => {
-      const roomPrice = calculateRoomPrice(room.roomId, room.check_in_date, room.check_out_date);
-      return sum + roomPrice - (room.discount || 0);
+      return sum + (room.price || 0) - (room.discount || 0);
     }, 0);
     
     const extrasTotal = extras.reduce((sum, extra) => {
@@ -101,6 +203,7 @@ export default function BookingsPage() {
   // Helper functions for managing extras
   const addExtra = () => {
     const newExtras = [...bookingExtras, {
+      extraId: "",
       label: "",
       price: 0,
       quantity: 1
@@ -123,6 +226,36 @@ export default function BookingsPage() {
   };
 
   // Filter bookings based on selected filters
+  // Filter guests based on search term
+  const filteredGuestOptions = guests.filter(guest =>
+    guest.name.toLowerCase().includes(guestSearchTerm.toLowerCase()) ||
+    guest.email?.toLowerCase().includes(guestSearchTerm.toLowerCase()) ||
+    guest.phone?.includes(guestSearchTerm)
+  );
+
+  // Filtered guest options for booking modal
+  const filteredBookingModalGuests = guests.filter(guest =>
+    guest.name.toLowerCase().includes(bookingModalGuestSearch.toLowerCase()) ||
+    guest.email?.toLowerCase().includes(bookingModalGuestSearch.toLowerCase()) ||
+    guest.phone?.includes(bookingModalGuestSearch)
+  );
+
+  // Handle guest selection
+  const handleGuestSelect = (guestId: string, guestName: string) => {
+    setSelectedGuest(guestId);
+    setGuestSearchTerm(guestName);
+    setShowGuestDropdown(false);
+  };
+
+  // Handle guest search input
+  const handleGuestSearchChange = (value: string) => {
+    setGuestSearchTerm(value);
+    setShowGuestDropdown(true);
+    if (value === "") {
+      setSelectedGuest("");
+    }
+  };
+
   const applyFilters = () => {
     let filtered = [...bookings];
 
@@ -227,13 +360,30 @@ export default function BookingsPage() {
     }
   };
 
+  const fetchExtras = async () => {
+    try {
+      const res = await fetch("/api/extras");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setExtras(data);
+      } else {
+        console.error('Extras API returned non-array data:', data);
+        setExtras([]);
+      }
+    } catch (error) {
+      console.error('Error fetching extras:', error);
+      setExtras([]);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       await Promise.all([
         fetchBookings(),
         fetchGuests(),
-        fetchRooms()
+        fetchRooms(),
+        fetchExtras()
       ]);
       setLoading(false);
     };
@@ -264,13 +414,34 @@ export default function BookingsPage() {
       // Set booking discount
       setBookingDiscount(booking.discount === 0 ? '' : booking.discount.toString());
       
-      // Convert booking extras to the form format
-      const extras = booking.booking_extras?.map(ex => ({
-        label: ex.label,
-        price: ex.price,
-        quantity: ex.quantity
-      })) || [];
-      setBookingExtras(extras);
+      // Set booking note
+      setBookingNote(booking.note || '');
+      
+      // Set guest search for editing
+      setBookingModalGuestSearch(booking.guest.name);
+      setBookingModalGuestId(booking.guest_id);
+      
+      // Convert booking extras to the form format and fetch package info
+      const extrasWithPackageInfo = booking.booking_extras?.map(ex => {
+        // Find the full extra details to get package info
+        const fullExtra = extras.find(e => e.id === ex.extra_id?.toString());
+        return {
+          extraId: ex.extra_id?.toString() || '',
+          label: ex.label,
+          price: ex.price,
+          quantity: ex.quantity,
+          isPackage: fullExtra ? (fullExtra as any).is_package || false : false,
+          includedNights: fullExtra ? (fullExtra as any).included_nights || null : null
+        };
+      }) || [];
+      setBookingExtras(extrasWithPackageInfo);
+      
+      // Apply package coverage to the rooms after loading extras
+      setTimeout(() => {
+        const roomsWithPackage = applyPackageCoverage(rooms);
+        setBookingRooms(roomsWithPackage);
+        calculateTotalPrice(roomsWithPackage, extrasWithPackageInfo);
+      }, 0);
       
       setTotalPrice(booking.total_price);
     } else {
@@ -278,7 +449,11 @@ export default function BookingsPage() {
       setBookingExtras([]);
       setTotalPrice(0);
       setBookingDiscount("");
+      setBookingNote("");
+      setBookingModalGuestSearch("");
+      setBookingModalGuestId("");
     }
+    setShowBookingModalGuestDropdown(false);
     setModalOpen(true);
   };
 
@@ -292,10 +467,9 @@ export default function BookingsPage() {
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    // Validate that we have at least one room
-    // Only require rooms when creating a new booking, not when editing
-    if (bookingRooms.length === 0 && !editingBooking) {
-      setError('Please add at least one room to the booking');
+    // Validate that we have at least one room OR at least one extra
+    if (bookingRooms.length === 0 && bookingExtras.length === 0) {
+      setError('Please add at least one room or extra to the booking');
       return;
     }
 
@@ -339,14 +513,14 @@ export default function BookingsPage() {
       return;
     }
 
-    const guestId = formData.get("guest_id");
-    if (!guestId) {
+    if (!bookingModalGuestId) {
       setError('Please select a guest');
+      setSubmittingBooking(false);
       return;
     }
 
     const payload = {
-      guestId: guestId.toString(),
+      guestId: bookingModalGuestId,
       booking_rooms: bookingRooms.map(room => ({
         ...room,
         price: calculateRoomPrice(room.roomId, room.check_in_date, room.check_out_date)
@@ -354,6 +528,7 @@ export default function BookingsPage() {
       booking_extras: bookingExtras,
       total_price: totalPrice,
       discount: bookingDiscount === '' ? 0 : Number(bookingDiscount),
+      note: bookingNote || undefined,
     };
 
     console.log('Submitting booking with payload:', payload);
@@ -569,11 +744,254 @@ export default function BookingsPage() {
     }
   };
 
+  // Handle file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setCheckInError("Please select an image file");
+      return;
+    }
+
+    setCheckInError("");
+    setUploadingImage(true);
+
+    try {
+      // Compress image to reduce size (target: 1-2MB)
+      const options = {
+        maxSizeMB: 1.5, // Target max file size in MB
+        maxWidthOrHeight: 1920, // Max dimension
+        useWebWorker: true, // Use web worker for better performance
+        fileType: 'image/jpeg' as const, // Convert to JPEG for better compression
+      };
+
+      toast.loading('Compressing image...', { id: 'compress' });
+      const compressedFile = await imageCompression(file, options);
+      toast.dismiss('compress');
+
+      // Calculate compression percentage
+      const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(2);
+      const savings = (((file.size - compressedFile.size) / file.size) * 100).toFixed(0);
+      
+      console.log(`Image compressed: ${originalSizeMB}MB → ${compressedSizeMB}MB (${savings}% smaller)`);
+      toast.success(`Image compressed to ${compressedSizeMB}MB`, { duration: 2000 });
+
+      setSelectedFile(compressedFile);
+
+      // Create preview from compressed file
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(compressedFile);
+
+      // Upload compressed image immediately
+      await handleImageUpload(compressedFile);
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      setCheckInError('Failed to compress image. Please try another image.');
+      setUploadingImage(false);
+    }
+  };
+
+  // Handle image upload to Cloudinary
+  const handleImageUpload = async (file: File) => {
+    setUploadingImage(true);
+    setCheckInError("");
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      setCheckInProofUrl(data.url);
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setCheckInError(error instanceof Error ? error.message : 'Failed to upload image');
+      setSelectedFile(null);
+      setPreviewUrl("");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Handle check-in submission
+  const handleCheckInSubmit = async () => {
+    if (!checkInBookingId || !checkInProofUrl) {
+      setCheckInError("Proof image is required");
+      return;
+    }
+
+    if (processingCheckIn || uploadingImage) return; // Prevent double submission
+
+    setProcessingCheckIn(true);
+    try {
+      const response = await fetch(`/api/bookings/${checkInBookingId}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ proofImageUrl: checkInProofUrl }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        await fetchBookings();
+        toast.success("Guest checked in successfully!");
+        setCheckInModalOpen(false);
+        setCheckInProofUrl("");
+        setCheckInError("");
+        setSelectedFile(null);
+        setPreviewUrl("");
+      } else {
+        setCheckInError(data.error || 'Failed to check in');
+      }
+    } catch (error) {
+      setCheckInError('Error processing check-in');
+    } finally {
+      setProcessingCheckIn(false);
+    }
+  };
+
+  // Check if today is the check-in date
+  const isCheckInDateToday = (booking: Booking): boolean => {
+    if (booking.booking_rooms.length === 0) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Get the earliest check-in date from all rooms
+    const earliestCheckIn = new Date(
+      Math.min(...booking.booking_rooms.map(room => new Date(room.check_in_date).getTime()))
+    );
+    earliestCheckIn.setHours(0, 0, 0, 0);
+    
+    return today.getTime() === earliestCheckIn.getTime();
+  };
+
+  // Open check-in modal
+  const openCheckInModal = (bookingId: number) => {
+    setCheckInBookingId(bookingId);
+    setCheckInProofUrl("");
+    setCheckInError("");
+    setSelectedFile(null);
+    setPreviewUrl("");
+    setUploadingImage(false);
+    setImageLoadError(false);
+    setCheckInModalOpen(true);
+  };
+
   const handlePartialPaymentInputChange = (value: string) => {
     // Only allow whole numbers (no decimals, no negative signs)
     const cleanValue = value.replace(/[^0-9]/g, '');
     setPartialPaymentAmount(cleanValue);
     setPartialPaymentError("");
+  };
+
+  // Export bookings to CSV
+  const exportBookingsCSV = () => {
+    if (filteredBookings.length === 0) {
+      toast.error("No bookings to export");
+      return;
+    }
+
+    // Create CSV headers
+    const headers = [
+      "Booking ID",
+      "Guest Name",
+      "Email",
+      "Phone",
+      "Status",
+      "Check-in Date",
+      "Check-out Date",
+      "Rooms",
+      "Extras",
+      "Total Price",
+      "Discount",
+      "Total Paid",
+      "Remaining",
+      "Payment Status",
+      "Note",
+      "Created At"
+    ];
+
+    // Create CSV rows
+    const rows = filteredBookings.map(booking => {
+      const roomsText = booking.booking_rooms.map(br => 
+        `Room ${rooms.find(r => r.id === br.room_id)?.room_number || br.room_id} (${new Date(br.check_in_date).toLocaleDateString()} - ${new Date(br.check_out_date).toLocaleDateString()})`
+      ).join('; ');
+      
+      const extrasText = booking.booking_extras.map(ex => 
+        `${ex.label} x${ex.quantity}`
+      ).join('; ');
+
+      const paymentStatus = booking.remaining <= 0 ? 'Fully Paid' : 
+                           booking.total_paid > 0 ? 'Partially Paid' : 'Unpaid';
+
+      const earliestCheckIn = booking.booking_rooms.length > 0 
+        ? new Date(Math.min(...booking.booking_rooms.map(br => new Date(br.check_in_date).getTime()))).toLocaleDateString()
+        : 'N/A';
+      
+      const latestCheckOut = booking.booking_rooms.length > 0
+        ? new Date(Math.max(...booking.booking_rooms.map(br => new Date(br.check_out_date).getTime()))).toLocaleDateString()
+        : 'N/A';
+
+      return [
+        booking.id,
+        booking.guest.name,
+        booking.guest.email || '',
+        booking.guest.phone || '',
+        booking.status,
+        earliestCheckIn,
+        latestCheckOut,
+        roomsText || 'No rooms',
+        extrasText || 'No extras',
+        booking.total_price.toFixed(2),
+        booking.discount.toFixed(2),
+        booking.total_paid.toFixed(2),
+        booking.remaining.toFixed(2),
+        paymentStatus,
+        booking.note || '',
+        new Date(booking.created_at).toLocaleDateString()
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const monthText = selectedMonth 
+      ? new Date(selectedMonth + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+      : 'All';
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Bookings_${monthText}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${filteredBookings.length} bookings!`);
   };
 
   if (loading) {
@@ -651,22 +1069,60 @@ export default function BookingsPage() {
               <option value="checkin_checkout">Check-in/Check-out</option>
             </select>
           </div>
-          <div>
+          <div className="relative guest-search-container">
             <label className="block text-sm font-semibold text-gray-800 mb-3">
               👤 Filter by Guest
             </label>
-            <select
-              value={selectedGuest}
-              onChange={(e) => setSelectedGuest(e.target.value)}
-              className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
-            >
-              <option value="">All Guests</option>
-              {guests.map((guest) => (
-                <option key={guest.id} value={guest.id}>
-                  {guest.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={guestSearchTerm}
+                onChange={(e) => handleGuestSearchChange(e.target.value)}
+                onFocus={() => setShowGuestDropdown(true)}
+                placeholder="Search by name, email, or phone..."
+                className="w-full border-2 border-stone-200 rounded-xl px-4 py-3 bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+              />
+              {guestSearchTerm && (
+                <button
+                  onClick={() => {
+                    setGuestSearchTerm("");
+                    setSelectedGuest("");
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            {/* Dropdown Results */}
+            {showGuestDropdown && guestSearchTerm && filteredGuestOptions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border-2 border-stone-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                {filteredGuestOptions.map((guest) => (
+                  <button
+                    key={guest.id}
+                    onClick={() => handleGuestSelect(guest.id, guest.name)}
+                    className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-stone-100 last:border-b-0"
+                  >
+                    <div className="font-semibold text-gray-900">{guest.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {guest.email && <span>{guest.email}</span>}
+                      {guest.email && guest.phone && <span> • </span>}
+                      {guest.phone && <span>{guest.phone}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* No results message */}
+            {showGuestDropdown && guestSearchTerm && filteredGuestOptions.length === 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border-2 border-stone-200 rounded-xl shadow-xl p-4">
+                <p className="text-gray-600 text-sm">No guests found matching "{guestSearchTerm}"</p>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-800 mb-3">
@@ -683,16 +1139,23 @@ export default function BookingsPage() {
               <option value="unpaid">Unpaid</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={() => {
                 setSelectedMonth("");
                 setSelectedGuest("");
+                setGuestSearchTerm("");
                 setSelectedStatus("");
               }}
-              className="w-full px-4 py-3 bg-gradient-to-r from-stone-500 to-stone-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-stone-500 to-stone-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
             >
               🗑️ Clear Filters
+            </button>
+            <button
+              onClick={exportBookingsCSV}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 font-semibold"
+            >
+              📥 Export CSV
             </button>
           </div>
         </div>
@@ -730,6 +1193,7 @@ export default function BookingsPage() {
                 className={`cursor-pointer hover:bg-gray-100 ${isPaid ? 'bg-gray-200' : ''}`}
                 onDoubleClick={() => {
                   setSelectedBooking(b);
+                  setImageLoadError(false);
                   setDetailModalOpen(true);
                 }}
               >
@@ -802,6 +1266,18 @@ export default function BookingsPage() {
                   >
                     {processingPayment ? 'Processing...' : 'Partial Paid'}
                   </button>
+                  <button
+                    className={`px-2 py-1 rounded mx-1 ${
+                      b.status === 'checked_in' || processingCheckIn || !isCheckInDateToday(b)
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                        : 'bg-amber-700 text-white hover:bg-amber-800'
+                    }`}
+                    onClick={() => openCheckInModal(Number(b.id))}
+                    disabled={b.status === 'checked_in' || processingCheckIn || !isCheckInDateToday(b)}
+                    title={!isCheckInDateToday(b) && b.status !== 'checked_in' ? 'Check-in only available on check-in date' : ''}
+                  >
+                    {b.status === 'checked_in' ? 'Checked In' : 'Check In'}
+                  </button>
                 </td>
               </tr>
             );
@@ -827,6 +1303,7 @@ export default function BookingsPage() {
             }`}
             onDoubleClick={() => {
               setSelectedBooking(b);
+              setImageLoadError(false);
               setDetailModalOpen(true);
             }}
           >
@@ -922,6 +1399,18 @@ export default function BookingsPage() {
                 disabled={isPaid || processingPayment}
               >
                 {processingPayment ? 'Processing...' : 'Partial Paid'}
+              </button>
+              <button
+                className={`flex-1 px-3 py-2 rounded text-sm ${
+                  b.status === 'checked_in' || processingCheckIn || !isCheckInDateToday(b)
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                    : 'bg-amber-700 text-white hover:bg-amber-800'
+                }`}
+                onClick={() => openCheckInModal(Number(b.id))}
+                disabled={b.status === 'checked_in' || processingCheckIn || !isCheckInDateToday(b)}
+                title={!isCheckInDateToday(b) && b.status !== 'checked_in' ? 'Check-in only available on check-in date' : ''}
+              >
+                {b.status === 'checked_in' ? 'Checked In' : 'Check In'}
               </button>
             </div>
           </div>
@@ -1023,21 +1512,87 @@ export default function BookingsPage() {
             </Dialog.Title>
 
             <form onSubmit={handleBookingSubmit} className="space-y-4">
-              <div>
+              <div className="booking-modal-guest-search">
                 <label className="block font-semibold mb-1 text-black">Guest</label>
-                <select
-                  name="guest_id"
-                  defaultValue={editingBooking?.guest_id || ""}
-                  className="w-full border border-gray-300 rounded p-2 bg-white text-black"
-                  required
-                >
-                  <option value="">Select Guest</option>
-                  {guests.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={bookingModalGuestSearch}
+                    onChange={(e) => {
+                      setBookingModalGuestSearch(e.target.value);
+                      setShowBookingModalGuestDropdown(true);
+                      if (e.target.value === "") {
+                        setBookingModalGuestId("");
+                      }
+                    }}
+                    onFocus={() => setShowBookingModalGuestDropdown(true)}
+                    placeholder="Search guest by name, email, or phone..."
+                    className="w-full border border-gray-300 rounded p-2 bg-white text-black pr-10"
+                    required={!bookingModalGuestId}
+                  />
+                  {bookingModalGuestSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookingModalGuestSearch("");
+                        setBookingModalGuestId("");
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                  
+                  {/* Dropdown */}
+                  {showBookingModalGuestDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border-2 border-stone-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                      {/* Add New Guest Option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.href = "/guests";
+                        }}
+                        className="w-full text-left px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors border-b-2 border-amber-200 font-semibold text-amber-800"
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Add New Guest
+                        </div>
+                      </button>
+                      
+                      {/* Existing Guests */}
+                      {filteredBookingModalGuests.length > 0 ? (
+                        filteredBookingModalGuests.map((guest) => (
+                          <button
+                            key={guest.id}
+                            type="button"
+                            onClick={() => {
+                              setBookingModalGuestSearch(guest.name);
+                              setBookingModalGuestId(guest.id);
+                              setShowBookingModalGuestDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-stone-100 last:border-b-0"
+                          >
+                            <div className="font-semibold text-gray-900">{guest.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {guest.email && <span>{guest.email}</span>}
+                              {guest.email && guest.phone && <span> • </span>}
+                              {guest.phone && <span>{guest.phone}</span>}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-gray-500 text-sm">
+                          No guests found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Rooms Section */}
@@ -1059,19 +1614,47 @@ export default function BookingsPage() {
                   </div>
                 )}
 
-                {bookingRooms.map((room, index) => (
+                {bookingRooms.map((room, index) => {
+                  // Check if this room is included in a package based on room-nights
+                  const packageExtra = bookingExtras.find(e => e.isPackage && e.includedNights);
+                  let isIncludedInPackage = false;
+                  
+                  if (packageExtra && packageExtra.includedNights) {
+                    // Calculate cumulative room-nights up to this room
+                    let cumulativeNights = 0;
+                    for (let i = 0; i <= index; i++) {
+                      const checkIn = new Date(bookingRooms[i].check_in_date);
+                      const checkOut = new Date(bookingRooms[i].check_out_date);
+                      const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                      if (i < index) {
+                        cumulativeNights += nights;
+                      } else {
+                        // For current room, check if any nights are covered
+                        if (cumulativeNights < packageExtra.includedNights) {
+                          isIncludedInPackage = true;
+                        }
+                      }
+                    }
+                  }
+                  
+                  return (
                   <div key={index} className="border border-gray-300 rounded p-3 mb-3 bg-gray-50">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-black">Room {index + 1}</span>
-                      {bookingRooms.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRoom(index)}
-                          className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                        >
-                          Remove
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-black">Room {index + 1}</span>
+                        {isIncludedInPackage && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-semibold">
+                            📦 Included in Package
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeRoom(index)}
+                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                      >
+                        Remove
+                      </button>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1145,13 +1728,13 @@ export default function BookingsPage() {
               <div>
                         <label className="block text-sm font-medium text-black mb-1">Discount (₱)</label>
                         <input
-                          type="number"
-                          step="1"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={room.discount === 0 ? '' : room.discount}
                           onChange={(e) => {
-                            const value = e.target.value === '' ? 0 : Math.floor(Number(e.target.value));
-                            updateRoom(index, 'discount', value);
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            updateRoom(index, 'discount', value === '' ? 0 : parseInt(value));
                           }}
                           className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
                           placeholder="0"
@@ -1159,7 +1742,8 @@ export default function BookingsPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Additional Extras Section */}
@@ -1178,6 +1762,8 @@ export default function BookingsPage() {
                 {bookingExtras.length === 0 && (
                   <div className="text-gray-500 text-sm italic mb-3">
                     Click "Add Extra" to add extras like towels, motorcycle rental, tours, etc.
+                    <br />
+                    <span className="text-purple-600 font-semibold">💡 Tip: Select a Package to include room nights at no extra charge!</span>
                   </div>
                 )}
 
@@ -1196,30 +1782,86 @@ export default function BookingsPage() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-black mb-1">Item</label>
-                        <input
-                          type="text"
-                          value={extra.label}
-                          onChange={(e) => updateExtra(index, 'label', e.target.value)}
-                          placeholder="e.g., Extra Towel, Motorcycle, Tour"
+                        <label className="block text-sm font-medium text-black mb-1">Service/Tour</label>
+                        <select
+                          value={extra.extraId || ''}
+                          onChange={(e) => {
+                            const selectedExtra = extras.find(ex => ex.id === e.target.value);
+                            if (selectedExtra) {
+                              const newExtras = [...bookingExtras];
+                              newExtras[index] = {
+                                ...newExtras[index],
+                                extraId: e.target.value,
+                                label: selectedExtra.name,
+                                price: Number(selectedExtra.price),
+                                isPackage: (selectedExtra as any).is_package || false,
+                                includedNights: (selectedExtra as any).included_nights || null
+                              };
+                              setBookingExtras(newExtras);
+                              
+                              // If it's a package, allocate free room-nights based on total nights
+                              if ((selectedExtra as any).is_package && (selectedExtra as any).included_nights) {
+                                const updatedRooms = [...bookingRooms];
+                                const packageNights = (selectedExtra as any).included_nights;
+                                let remainingPackageNights = packageNights;
+                                
+                                // Calculate nights for each room and allocate package coverage
+                                for (let i = 0; i < updatedRooms.length && remainingPackageNights > 0; i++) {
+                                  const checkIn = new Date(updatedRooms[i].check_in_date);
+                                  const checkOut = new Date(updatedRooms[i].check_out_date);
+                                  const roomNights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                                  
+                                  if (roomNights <= remainingPackageNights) {
+                                    // This entire room is covered by the package
+                                    updatedRooms[i] = { ...updatedRooms[i], price: 0, discount: 0 };
+                                    remainingPackageNights -= roomNights;
+                                  } else {
+                                    // Package partially covers this room
+                                    // Calculate the original price per night
+                                    const originalPrice = calculateRoomPrice(updatedRooms[i].roomId, updatedRooms[i].check_in_date, updatedRooms[i].check_out_date);
+                                    const pricePerNight = originalPrice / roomNights;
+                                    const uncoveredNights = roomNights - remainingPackageNights;
+                                    updatedRooms[i] = { 
+                                      ...updatedRooms[i], 
+                                      price: pricePerNight * uncoveredNights, 
+                                      discount: 0 
+                                    };
+                                    remainingPackageNights = 0;
+                                  }
+                                }
+                                
+                                setBookingRooms(updatedRooms);
+                                calculateTotalPrice(updatedRooms, newExtras);
+                              } else {
+                                calculateTotalPrice(bookingRooms, newExtras);
+                              }
+                            }
+                          }}
                           className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
                           required
-                        />
+                        >
+                          <option value="">Select an extra...</option>
+                          {extras.map(ex => (
+                            <option key={ex.id} value={ex.id}>
+                              {ex.name} - ₱{Number(ex.price).toFixed(2)}
+                              {(ex as any).is_package && (ex as any).included_nights ? ` (Package: ${(ex as any).included_nights}N included)` : ''}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium text-black mb-1">Price (₱)</label>
-                <input
-                  type="number"
-                  step="0.01"
+                        <input
+                          type="number"
+                          step="0.01"
                           value={extra.price}
-                          onChange={(e) => updateExtra(index, 'price', Number(e.target.value))}
-                          className="w-full border border-gray-300 rounded p-2 bg-white text-black text-sm"
-                  required
-                />
-              </div>
+                          readOnly
+                          className="w-full border border-gray-300 rounded p-2 bg-gray-100 text-black text-sm cursor-not-allowed"
+                        />
+                      </div>
 
-              <div>
+                      <div>
                         <label className="block text-sm font-medium text-black mb-1">Quantity</label>
                         <input
                           type="number"
@@ -1247,16 +1889,28 @@ export default function BookingsPage() {
               <div>
                 <label className="block font-semibold mb-1 text-black">Booking Discount (₱)</label>
                 <input
-                  type="number"
-                  step="1"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={bookingDiscount}
                   onChange={(e) => {
-                    const value = e.target.value === '' ? '' : Math.floor(Number(e.target.value)).toString();
+                    const value = e.target.value.replace(/[^0-9]/g, '');
                     setBookingDiscount(value);
                   }}
                   className="w-full border border-gray-300 rounded p-2 bg-white text-black"
                   placeholder="0"
+                />
+              </div>
+
+              {/* Booking Note */}
+              <div>
+                <label className="block font-semibold mb-1 text-black">Note (Optional)</label>
+                <textarea
+                  value={bookingNote}
+                  onChange={(e) => setBookingNote(e.target.value)}
+                  className="w-full border border-gray-300 rounded p-2 bg-white text-black"
+                  placeholder="Add any special notes or requests..."
+                  rows={3}
                 />
               </div>
 
@@ -1418,15 +2072,19 @@ export default function BookingsPage() {
                             <div className="flex items-center gap-2">
                               <span className="text-black font-medium">₱</span>
                               <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={editingPaymentAmount}
-                                onChange={(e) => setEditingPaymentAmount(e.target.value)}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/[^0-9]/g, '');
+                                  setEditingPaymentAmount(value);
+                                }}
                                 className="flex-1 border border-gray-300 rounded px-2 py-1 text-black"
                                 autoFocus
                               />
                               <button
-                                onClick={() => handleUpdatePayment(payment.id, parseFloat(editingPaymentAmount))}
+                                onClick={() => handleUpdatePayment(payment.id, parseInt(editingPaymentAmount))}
                                 className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
                               >
                                 Save
@@ -1475,6 +2133,64 @@ export default function BookingsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Check-in Status and Proof */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-black mb-3">Check-in Status</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-700">Status:</span>
+                      <span className={`px-3 py-1 rounded text-sm font-medium ${
+                        selectedBooking.status === 'checked_in' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedBooking.status === 'checked_in' ? '✓ Checked In' : 'Not Checked In'}
+                      </span>
+                    </div>
+                    
+                    {selectedBooking.status === 'checked_in' && selectedBooking.proof_image_url && (
+                      <>
+                        <div className="border-t pt-3">
+                          <p className="text-gray-700 mb-2 font-medium">Check-in Proof:</p>
+                          {!imageLoadError ? (
+                            <div className="relative group">
+                              <img
+                                src={selectedBooking.proof_image_url}
+                                alt="Check-in proof"
+                                className="w-full max-w-md mx-auto h-auto rounded-lg border-2 border-amber-200 shadow-sm"
+                                onError={() => setImageLoadError(true)}
+                              />
+                              <a
+                                href={selectedBooking.proof_image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute top-2 right-2 bg-amber-700 text-white p-2 rounded-full hover:bg-amber-800 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
+                                title="Open in new tab"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="w-full max-w-md mx-auto h-48 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center p-6">
+                              <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <line x1="4" y1="4" x2="20" y2="20" strokeWidth={2} />
+                              </svg>
+                              <p className="text-gray-600 font-medium mb-1">Image no longer available</p>
+                              <p className="text-gray-500 text-sm text-center">This image may have been removed after 2 months to save storage space</p>
+                            </div>
+                          )}
+                          <div className="text-sm text-gray-600 border-t pt-2 mt-3">
+                            <p>Checked in: {new Date(selectedBooking.updated_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
 
                 {/* Timestamps */}
                 <div className="text-sm text-gray-600 border-t pt-3">
@@ -1552,6 +2268,154 @@ export default function BookingsPage() {
                   type="button"
                   onClick={() => setPartialPaymentModalOpen(false)}
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Check-In Modal */}
+      <Dialog
+        open={checkInModalOpen}
+        onClose={() => setCheckInModalOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-xl border-2 border-stone-200">
+            <Dialog.Title className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <span className="text-3xl">📸</span> Check-In Guest
+            </Dialog.Title>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> Check-in is only allowed on the check-in date. Please upload a photo of the guest for verification.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Upload Proof Image <span className="text-red-500">*</span>
+                </label>
+                
+                {!previewUrl ? (
+                  <div className="space-y-3">
+                    {uploadingImage ? (
+                      <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl border-gray-300 bg-gray-50">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-200 border-t-amber-700 mb-3"></div>
+                        <p className="text-sm text-gray-700 font-semibold">Uploading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Camera Capture Input */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleFileSelect}
+                          disabled={uploadingImage || processingCheckIn}
+                          className="hidden"
+                          id="check-in-camera-input"
+                        />
+                        
+                        {/* Gallery Selection Input */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileSelect}
+                          disabled={uploadingImage || processingCheckIn}
+                          className="hidden"
+                          id="check-in-gallery-input"
+                        />
+                        
+                        {/* Take Photo Button */}
+                        <label
+                          htmlFor="check-in-camera-input"
+                          className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl cursor-pointer hover:from-amber-700 hover:to-amber-800 transition-all duration-300 shadow-md hover:shadow-lg"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="font-semibold text-base">📸 Take Photo</span>
+                        </label>
+                        
+                        {/* Choose from Gallery Button */}
+                        <label
+                          htmlFor="check-in-gallery-input"
+                          className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-white border-2 border-amber-600 text-amber-700 rounded-xl cursor-pointer hover:bg-amber-50 transition-all duration-300 shadow-sm hover:shadow-md"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="font-semibold text-base">🖼️ Choose from Gallery</span>
+                        </label>
+                        
+                        <p className="text-xs text-center text-gray-500">PNG, JPG, JPEG (Auto-compressed to ~1-2MB)</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-xl border-2 border-amber-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setPreviewUrl("");
+                        setCheckInProofUrl("");
+                      }}
+                      disabled={uploadingImage || processingCheckIn}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    {checkInProofUrl && (
+                      <div className="absolute bottom-2 left-2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Uploaded
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {checkInError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
+                  <p className="text-sm text-red-700">{checkInError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCheckInSubmit}
+                  disabled={processingCheckIn || uploadingImage || !checkInProofUrl}
+                  className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    processingCheckIn || uploadingImage || !checkInProofUrl
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-amber-700 to-amber-900 text-white hover:shadow-lg hover:scale-105'
+                  }`}
+                >
+                  {processingCheckIn ? 'Checking In...' : uploadingImage ? 'Uploading...' : '✓ Check In Guest'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckInModalOpen(false)}
+                  disabled={processingCheckIn || uploadingImage}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-400 transition-colors font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancel
                 </button>

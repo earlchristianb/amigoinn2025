@@ -2,34 +2,47 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function addAdminEmails() {
+async function addAdminProfiles() {
   try {
-    console.log('Adding admin emails...');
+    console.log('Adding admin profiles...');
 
-    // Add admin emails - replace with actual admin emails
-    const adminEmails = [
-      'admin@amigoinn.com',
-      'manager@amigoinn.com',
-      // Add more admin emails here
+    // Add admin profiles - replace with actual admin information
+    const adminProfiles = [
+      { 
+        name: 'Admin User',
+        email: 'admin@amigoinn.com',
+        role: 'admin' as const
+      },
+      { 
+        name: 'Manager User',
+        email: 'manager@amigoinn.com',
+        role: 'admin' as const
+      },
+      // Add more admin profiles here
     ];
 
-    for (const email of adminEmails) {
-      await prisma.adminEmail.upsert({
-        where: { email },
-        update: {},
+    for (const profile of adminProfiles) {
+      await prisma.profile.upsert({
+        where: { email: profile.email },
+        update: {
+          name: profile.name,
+          role: profile.role,
+        },
         create: {
-          email,
+          name: profile.name,
+          email: profile.email,
+          role: profile.role,
         },
       });
-      console.log(`Added admin email: ${email}`);
+      console.log(`Added/Updated admin profile: ${profile.name} (${profile.email}) - Role: ${profile.role}`);
     }
 
-    console.log('Admin emails added successfully!');
+    console.log('Admin profiles added successfully!');
   } catch (error) {
-    console.error('Error adding admin emails:', error);
+    console.error('Error adding admin profiles:', error);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-addAdminEmails();
+addAdminProfiles();

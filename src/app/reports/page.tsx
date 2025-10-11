@@ -6,6 +6,7 @@ import AdminNavigation from "@/components/AdminNavigation";
 import AdminAuthGuard from "@/components/AdminAuthGuard";
 import toast, { Toaster } from "react-hot-toast";
 import Papa from "papaparse";
+import { useUser } from "@clerk/nextjs";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -33,11 +34,15 @@ ChartJS.register(
 );
 
 export default function ReportsPage() {
+  const { user: clerkUser } = useUser();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [monthFilterType, setMonthFilterType] = useState<string>("created_at"); // Default to "created_at"
+  const [viewType, setViewType] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   // Utility function to format numbers with commas
   const formatCurrency = (amount: number): string => {
@@ -47,13 +52,12 @@ export default function ReportsPage() {
     });
   };
 
-  // Calculate monthly earnings for the current year
-  const calculateMonthlyEarnings = () => {
-    const currentYear = new Date().getFullYear();
+  // Calculate monthly earnings for a specific year
+  const calculateMonthlyEarnings = (year: number) => {
     const monthlyEarnings = Array.from({ length: 12 }, (_, index) => {
       const month = index; // 0-11 for Jan-Dec
-      const monthStart = new Date(currentYear, month, 1);
-      const monthEnd = new Date(currentYear, month + 1, 0);
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0);
       
       const monthBookings = bookings.filter(booking => {
         const bookingDate = new Date(booking.created_at);
@@ -75,15 +79,65 @@ export default function ReportsPage() {
     return monthlyEarnings;
   };
 
-  const monthlyEarnings = calculateMonthlyEarnings();
+  // Calculate yearly earnings (last 5 years)
+  const calculateYearlyEarnings = () => {
+    const currentYear = new Date().getFullYear();
+    const yearlyEarnings = Array.from({ length: 5 }, (_, index) => {
+      const year = currentYear - 4 + index; // Last 5 years
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+      
+      const yearBookings = bookings.filter(booking => {
+        const bookingDate = new Date(booking.created_at);
+        return bookingDate >= yearStart && bookingDate <= yearEnd;
+      });
+      
+      const totalEarnings = yearBookings.reduce((sum, booking) => {
+        const totalPaid = booking.payments?.reduce((paymentSum, payment) => 
+          paymentSum + Number(payment.amount), 0) || 0;
+        return sum + totalPaid;
+      }, 0);
+      
+      return {
+        year: year.toString(),
+        earnings: totalEarnings
+      };
+    });
+    
+    return yearlyEarnings;
+  };
 
-  // Chart data configuration
-  const chartData = {
+  const monthlyEarnings = calculateMonthlyEarnings(parseInt(selectedYear));
+  const yearlyEarnings = calculateYearlyEarnings();
+
+  // Chart data configuration - switch based on view type
+  const chartData = viewType === 'monthly' ? {
     labels: monthlyEarnings.map(item => item.month),
     datasets: [
       {
-        label: 'Monthly Earnings (₱)',
+        label: `Monthly Earnings ${selectedYear} (₱)`,
         data: monthlyEarnings.map(item => item.earnings),
+        borderColor: 'rgb(180, 83, 9)', // amber-700
+        backgroundColor: 'rgba(180, 83, 9, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: 'rgb(180, 83, 9)',
+        pointBorderColor: 'rgb(255, 255, 255)',
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: 'rgb(180, 83, 9)',
+        pointHoverBorderColor: 'rgb(255, 255, 255)',
+        pointHoverBorderWidth: 3,
+      },
+    ],
+  } : {
+    labels: yearlyEarnings.map(item => item.year),
+    datasets: [
+      {
+        label: 'Yearly Earnings (₱)',
+        data: yearlyEarnings.map(item => item.earnings),
         borderColor: 'rgb(180, 83, 9)', // amber-700
         backgroundColor: 'rgba(180, 83, 9, 0.1)',
         borderWidth: 3,
@@ -185,6 +239,27 @@ export default function ReportsPage() {
     unpaidCount: 0,
   });
 
+
+  // Check user role
+  useEffect(() => {
+    const checkRole = async () => {
+      if (clerkUser?.emailAddresses?.[0]?.emailAddress) {
+        const response = await fetch('/api/auth/check-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: clerkUser.emailAddresses[0].emailAddress })
+        });
+        const data = await response.json();
+        setCurrentUserRole(data.role);
+        
+        // If not admin, redirect
+        if (data.role !== 'admin') {
+          window.location.href = '/dashboard';
+        }
+      }
+    };
+    checkRole();
+  }, [clerkUser]);
 
   // Fetch all bookings
   useEffect(() => {
@@ -390,7 +465,7 @@ export default function ReportsPage() {
     toast.success("Summary exported successfully!");
   };
 
-  if (loading) {
+  if (loading || !currentUserRole) {
     return (
       <AdminAuthGuard>
         <div className="min-h-screen bg-gray-50">
@@ -398,6 +473,26 @@ export default function ReportsPage() {
           <main className="p-6">
             <div className="flex items-center justify-center h-64">
               <div className="text-lg text-gray-600">Loading reports...</div>
+            </div>
+          </main>
+        </div>
+      </AdminAuthGuard>
+    );
+  }
+
+  // Only admin can access reports
+  if (currentUserRole !== 'admin') {
+    return (
+      <AdminAuthGuard>
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-stone-50">
+          <AdminNavigation currentPage="reports" />
+          <main className="p-6">
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <div className="text-6xl mb-4">🔒</div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+                <p className="text-gray-600">This page is only accessible to administrators.</p>
+              </div>
             </div>
           </main>
         </div>
@@ -415,7 +510,7 @@ export default function ReportsPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h2 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-900 bg-clip-text text-transparent mb-3">📊 Reports & Analytics</h2>
-          <p className="text-gray-700 text-lg">Generate and export booking reports 🏨</p>
+          <p className="text-gray-700 text-lg">Generate and export booking reports</p>
         </div>
 
         {/* Filter Section */}
@@ -476,16 +571,64 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Monthly Earnings Chart */}
+        {/* Earnings Chart */}
         <div className="mb-8">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-stone-200 p-6">
             <div className="mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <span className="text-3xl">📈</span> Monthly Earnings Overview
-              </h3>
-              <p className="text-gray-600">
-                Track your monthly earnings throughout {new Date().getFullYear()} to identify trends and peak seasons
-              </p>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <span className="text-3xl">📈</span> 
+                    {viewType === 'monthly' ? 'Monthly' : 'Yearly'} Earnings Overview
+                  </h3>
+                  <p className="text-gray-600">
+                    {viewType === 'monthly' 
+                      ? `Track your monthly earnings for ${selectedYear} to identify trends and peak seasons`
+                      : 'Compare yearly performance over the last 5 years'
+                    }
+                  </p>
+                </div>
+                
+                {/* View Toggle */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-2 bg-stone-100 rounded-xl p-1">
+                    <button
+                      onClick={() => setViewType('monthly')}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                        viewType === 'monthly'
+                          ? 'bg-amber-700 text-white shadow-lg'
+                          : 'text-gray-700 hover:bg-stone-200'
+                      }`}
+                    >
+                      📅 Monthly
+                    </button>
+                    <button
+                      onClick={() => setViewType('yearly')}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                        viewType === 'yearly'
+                          ? 'bg-amber-700 text-white shadow-lg'
+                          : 'text-gray-700 hover:bg-stone-200'
+                      }`}
+                    >
+                      📊 Yearly
+                    </button>
+                  </div>
+                  
+                  {/* Year Selector (only for monthly view) */}
+                  {viewType === 'monthly' && (
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="px-4 py-2 border-2 border-stone-200 rounded-xl bg-white focus:border-amber-700 focus:ring-2 focus:ring-amber-200 transition-all duration-300 font-medium text-gray-800"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const year = new Date().getFullYear() - i;
+                        return <option key={year} value={year}>{year}</option>;
+                      })}
+                    </select>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="relative h-96">
@@ -494,45 +637,91 @@ export default function ReportsPage() {
             
             {/* Chart Statistics */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">📊</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Best Month</p>
-                    <p className="text-lg font-bold text-amber-700">
-                      {monthlyEarnings.reduce((max, current) => 
-                        current.earnings > max.earnings ? current : max, monthlyEarnings[0]
-                      )?.month || 'N/A'}
-                    </p>
+              {viewType === 'monthly' ? (
+                <>
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">📊</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Best Month</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          {monthlyEarnings.reduce((max, current) => 
+                            current.earnings > max.earnings ? current : max, monthlyEarnings[0]
+                          )?.month || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">💰</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Highest Earnings</p>
-                    <p className="text-lg font-bold text-amber-700">
-                      ₱{formatCurrency(Math.max(...monthlyEarnings.map(m => m.earnings)))}
-                    </p>
+                  
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">💰</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Highest Earnings</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          ₱{formatCurrency(Math.max(...monthlyEarnings.map(m => m.earnings)))}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">📅</span>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Average Monthly</p>
-                    <p className="text-lg font-bold text-amber-700">
-                      ₱{formatCurrency(
-                        monthlyEarnings.reduce((sum, month) => sum + month.earnings, 0) / 12
-                      )}
-                    </p>
+                  
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">📅</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Average Monthly</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          ₱{formatCurrency(
+                            monthlyEarnings.reduce((sum, month) => sum + month.earnings, 0) / 12
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">📊</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Best Year</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          {yearlyEarnings.reduce((max, current) => 
+                            current.earnings > max.earnings ? current : max, yearlyEarnings[0]
+                          )?.year || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">💰</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Highest Earnings</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          ₱{formatCurrency(Math.max(...yearlyEarnings.map(y => y.earnings)))}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-amber-50 to-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">📅</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Average Yearly</p>
+                        <p className="text-lg font-bold text-amber-700">
+                          ₱{formatCurrency(
+                            yearlyEarnings.reduce((sum, year) => sum + year.earnings, 0) / yearlyEarnings.length
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

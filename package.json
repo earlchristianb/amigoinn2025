@@ -9,7 +9,7 @@
     "lint": "eslint",
     "populate-rooms": "tsx scripts/populate-rooms.ts",
     "clear-and-reseed": "tsx scripts/clear-and-reseed.ts",
-    "add-admin-emails": "tsx scripts/add-admin-emails.ts",
+    "add-admin-profiles": "tsx scripts/add-admin-emails.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -20,7 +20,9 @@
     "@prisma/client": "^6.16.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
+    "browser-image-compression": "^2.0.2",
     "chart.js": "^4.5.0",
+    "cloudinary": "^2.7.0",
     "date-fns": "^4.1.0",
     "decimal.js": "^10.6.0",
     "next": "15.5.4",

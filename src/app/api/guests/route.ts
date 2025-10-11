@@ -6,6 +6,7 @@ import { Guest, CreateGuestRequest } from "@/types";
 export async function GET() {
   try {
     const guests = await prisma.guest.findMany({
+      where: { deletedAt: null },
       orderBy: { name: "asc" },
     });
     

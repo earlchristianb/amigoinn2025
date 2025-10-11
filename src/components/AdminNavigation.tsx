@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useClerk } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
+import { useClerk, useUser } from "@clerk/nextjs";
 
 interface AdminNavigationProps {
   currentPage: string;
@@ -9,16 +9,42 @@ interface AdminNavigationProps {
 
 export default function AdminNavigation({ currentPage }: AdminNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
 
-  const navigationItems = [
+  // Fetch user role
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (clerkUser?.emailAddresses?.[0]?.emailAddress) {
+        const response = await fetch('/api/auth/check-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: clerkUser.emailAddresses[0].emailAddress })
+        });
+        const data = await response.json();
+        setUserRole(data.role);
+      }
+    };
+    fetchRole();
+  }, [clerkUser]);
+
+  const baseNavigationItems = [
     { href: "/dashboard", label: "📅 Dashboard", key: "dashboard" },
     { href: "/bookings", label: "📋 Bookings", key: "bookings" },
     { href: "/rooms", label: "🏠 Rooms", key: "rooms" },
     { href: "/guests", label: "👥 Guests", key: "guests" },
-    { href: "/room-types", label: "🏷️ Room Types", key: "room-types" },
+    { href: "/extras", label: "💵 Extras", key: "extras" },
+  ];
+
+  const adminOnlyItems = [
+    { href: "/users", label: "👤 Users", key: "users" },
     { href: "/reports", label: "📊 Reports", key: "reports" },
   ];
+
+  const navigationItems = userRole === 'admin' 
+    ? [...baseNavigationItems, ...adminOnlyItems]
+    : baseNavigationItems;
 
   const handleLogout = async () => {
     await signOut({ redirectUrl: '/' });
